@@ -2,7 +2,7 @@
 'use server';
 import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import { Readable } from 'stream';
-import { getAudioDuration } from 'get-audio-duration';
+import getAudioDuration from 'get-audio-duration';
 
 export type SpeechMark = {
     time: number;
