@@ -2,6 +2,7 @@
 'use server';
 import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import { Readable } from 'stream';
+import { getAudioDuration } from 'get-audio-duration';
 
 export type SpeechMark = {
     time: number;
@@ -16,6 +17,45 @@ export type AmazonVoiceOutput = {
     speechMarks: SpeechMark[];
 }
 
+// Function to split text into Polly-friendly chunks (max 3000 chars)
+function splitTextIntoChunks(text: string, maxLength = 2800): string[] {
+    const chunks: string[] = [];
+    let remainingText = text;
+
+    while (remainingText.length > 0) {
+        if (remainingText.length <= maxLength) {
+            chunks.push(remainingText);
+            break;
+        }
+
+        let chunk = remainingText.substring(0, maxLength);
+        let lastSentenceEnd = -1;
+
+        const sentenceEnders = ['.', '?', '!', '\n'];
+        for (const p of sentenceEnders) {
+            const pos = chunk.lastIndexOf(p);
+            if (pos > -1 && (remainingText[pos + 1] === ' ' || remainingText[pos + 1] === '\n' || pos === chunk.length - 1)) {
+                lastSentenceEnd = Math.max(lastSentenceEnd, pos);
+            }
+        }
+        
+        let splitIndex;
+        if (lastSentenceEnd !== -1) {
+            splitIndex = lastSentenceEnd + 1;
+        } else {
+            const lastSpace = chunk.lastIndexOf(' ');
+            splitIndex = lastSpace !== -1 ? lastSpace : maxLength;
+        }
+        
+        chunk = remainingText.substring(0, splitIndex);
+        chunks.push(chunk);
+        remainingText = remainingText.substring(chunk.length).trim();
+    }
+
+    return chunks.filter(chunk => chunk.trim().length > 0);
+}
+
+
 // Helper to convert stream to Base64 string
 async function streamToString(stream: Readable): Promise<string> {
     const chunks: Buffer[] = [];
@@ -26,25 +66,81 @@ async function streamToString(stream: Readable): Promise<string> {
     });
 }
 
+// Helper to convert stream to Buffer for duration calculation
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+}
+
+
 // Helper to parse speech mark JSON lines
 function parseSpeechMarks(jsonLines: string): SpeechMark[] {
     if (!jsonLines) return [];
     const lines = jsonLines.trim().split('\n');
     return lines.map(line => {
-        const mark = JSON.parse(line);
-        // Ensure the type is one of the expected values
-        if (mark.type === 'sentence' || mark.type === 'word') {
-            return {
-                time: mark.time,
-                type: mark.type,
-                start: mark.start,
-                end: mark.end,
-                value: mark.value,
-            };
+        try {
+            const mark = JSON.parse(line);
+            if (mark.type === 'sentence' || mark.type === 'word') {
+                return {
+                    time: mark.time,
+                    type: mark.type,
+                    start: mark.start,
+                    end: mark.end,
+                    value: mark.value,
+                };
+            }
+        } catch (e) {
+            // Ignore lines that are not valid JSON
         }
         return null;
     }).filter((m): m is SpeechMark => m !== null);
 }
+
+async function synthesizeChunk(pollyClient: PollyClient, textChunk: string, voice: string) {
+    const audioCommand = new SynthesizeSpeechCommand({
+        Text: textChunk,
+        VoiceId: voice as any,
+        OutputFormat: 'mp3',
+        Engine: 'neural',
+    });
+    
+    const speechMarksCommand = new SynthesizeSpeechCommand({
+        Text: textChunk,
+        VoiceId: voice as any,
+        OutputFormat: 'json',
+        SpeechMarkTypes: [SpeechMarkType.SENTENCE, SpeechMarkType.WORD],
+        Engine: 'neural',
+    });
+
+    const [audioResponse, speechMarksResponse] = await Promise.all([
+        pollyClient.send(audioCommand),
+        pollyClient.send(speechMarksCommand)
+    ]);
+
+    if (!audioResponse.AudioStream || !speechMarksResponse.AudioStream) {
+        throw new Error('Amazon Polly did not return required streams.');
+    }
+    
+    const audioStreamReadable = audioResponse.AudioStream as Readable;
+    const speechMarksStreamReadable = speechMarksResponse.AudioStream as Readable;
+
+    // We need to clone the audio stream because it can only be consumed once.
+    // One clone goes to get the duration, the other to be converted to a data URI.
+    const audioBuffer = await streamToBuffer(audioStreamReadable);
+    const audioDataUri = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+
+    const duration = (await getAudioDuration(audioBuffer)) * 1000; // get duration in milliseconds
+    
+    const speechMarksJson = await streamToString(speechMarksStreamReadable);
+    const speechMarks = parseSpeechMarks(speechMarksJson);
+
+    return { audioDataUri, speechMarks, duration };
+}
+
 
 export async function generateAmazonVoice(formattedText: string, voice: string): Promise<AmazonVoiceOutput> {
     if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
@@ -59,43 +155,34 @@ export async function generateAmazonVoice(formattedText: string, voice: string):
         },
     });
 
-    const audioCommand = new SynthesizeSpeechCommand({
-        Text: formattedText,
-        VoiceId: voice as any,
-        OutputFormat: 'mp3',
-        Engine: 'neural',
-    });
+    const textChunks = splitTextIntoChunks(formattedText);
     
-    const speechMarksCommand = new SynthesizeSpeechCommand({
-        Text: formattedText,
-        VoiceId: voice as any,
-        OutputFormat: 'json',
-        SpeechMarkTypes: [SpeechMarkType.SENTENCE, SpeechMarkType.WORD],
-        Engine: 'neural',
-    });
-    
+    const allAudioDataUris: string[] = [];
+    const allSpeechMarks: SpeechMark[] = [];
+    let cumulativeDuration = 0;
+    let characterOffset = 0;
+
     try {
-        const [audioResponse, speechMarksResponse] = await Promise.all([
-            pollyClient.send(audioCommand),
-            pollyClient.send(speechMarksCommand)
-        ]);
-
-        if (!audioResponse.AudioStream) {
-            throw new Error('Amazon Polly did not return audio.');
-        }
-
-        const audioBase64 = await streamToString(audioResponse.AudioStream as Readable);
-        const audioDataUri = `data:audio/mp3;base64,${audioBase64}`;
-        
-        let speechMarks: SpeechMark[] = [];
-        if (speechMarksResponse.AudioStream) {
-            const speechMarksJson = await streamToString(speechMarksResponse.AudioStream as Readable);
-            speechMarks = parseSpeechMarks(speechMarksJson);
+        for (const chunk of textChunks) {
+            const { audioDataUri, speechMarks, duration } = await synthesizeChunk(pollyClient, chunk, voice);
+            
+            allAudioDataUris.push(audioDataUri);
+            
+            const adjustedMarks = speechMarks.map(mark => ({
+                ...mark,
+                time: mark.time + cumulativeDuration, // Offset time by duration of previous chunks
+                start: mark.start + characterOffset, // Offset character position
+                end: mark.end + characterOffset
+            }));
+            allSpeechMarks.push(...adjustedMarks);
+            
+            cumulativeDuration += duration;
+            characterOffset += chunk.length;
         }
 
         return { 
-            audioDataUris: [audioDataUri], // Return as an array with a single item for consistency
-            speechMarks 
+            audioDataUris: allAudioDataUris,
+            speechMarks: allSpeechMarks
         };
 
     } catch (error) {
