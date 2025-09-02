@@ -2,6 +2,7 @@
 'use server';
 import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import { Readable } from 'stream';
+import getAudioDuration from 'mp3-duration';
 
 export type SpeechMark = {
     time: number;
@@ -55,13 +56,13 @@ function splitTextIntoChunks(text: string, maxLength = 2800): string[] {
 }
 
 
-// Helper to convert stream to Base64 string
-async function streamToString(stream: Readable): Promise<string> {
+// Helper to convert stream to Buffer
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
     const chunks: Buffer[] = [];
     return new Promise((resolve, reject) => {
         stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
         stream.on('error', (err) => reject(err));
-        stream.on('end', () => resolve(Buffer.concat(chunks).toString('base64')));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
     });
 }
 
@@ -113,19 +114,15 @@ async function synthesizeChunk(pollyClient: PollyClient, textChunk: string, voic
         throw new Error('Amazon Polly did not return required streams.');
     }
     
-    const audioStreamReadable = audioResponse.AudioStream as Readable;
-    const speechMarksStreamReadable = speechMarksResponse.AudioStream as Readable;
+    const audioBuffer = await streamToBuffer(audioResponse.AudioStream as Readable);
+    const audioDataUri = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
     
-    const audioBase64 = await streamToString(audioStreamReadable);
-    const audioDataUri = `data:audio/mp3;base64,${audioBase64}`;
-    
-    const speechMarksJson = await streamToString(speechMarksStreamReadable);
+    const speechMarksJson = await streamToBuffer(speechMarksResponse.AudioStream as Readable).then(b => b.toString('utf8'));
     const speechMarks = parseSpeechMarks(speechMarksJson);
 
-    // Estimate duration. Average speaking rate is ~15 chars/sec. This is a rough heuristic.
-    const estimatedDuration = (textChunk.length / 15) * 1000; // in milliseconds
+    const duration = await getAudioDuration(audioBuffer) * 1000; // get duration in milliseconds
 
-    return { audioDataUri, speechMarks, duration: estimatedDuration };
+    return { audioDataUri, speechMarks, duration };
 }
 
 
@@ -164,7 +161,7 @@ export async function generateAmazonVoice(formattedText: string, voice: string):
             allSpeechMarks.push(...adjustedMarks);
             
             cumulativeDuration += duration;
-            characterOffset += chunk.length;
+            characterOffset += chunk.length + 1; // +1 for the space/newline that might be trimmed
         }
 
         return { 
