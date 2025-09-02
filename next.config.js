@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 
 /** @type {import('next').NextConfig} */
@@ -25,6 +26,12 @@ const nextConfig = {
       test: /README\.md$/,
       use: 'raw-loader',
     });
+    
+    // This is to fix another issue from the same library where it tries to parse a .d.ts file.
+    config.externals.push({
+      '@ffprobe-installer/ffprobe': 'commonjs @ffprobe-installer/ffprobe',
+    });
+
     return config;
   },
 };
