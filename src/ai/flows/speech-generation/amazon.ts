@@ -2,7 +2,6 @@
 'use server';
 import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import { Readable } from 'stream';
-import getAudioDuration from 'get-audio-duration';
 
 export type SpeechMark = {
     time: number;
@@ -66,17 +65,6 @@ async function streamToString(stream: Readable): Promise<string> {
     });
 }
 
-// Helper to convert stream to Buffer for duration calculation
-async function streamToBuffer(stream: Readable): Promise<Buffer> {
-    const chunks: Buffer[] = [];
-    return new Promise((resolve, reject) => {
-      stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-      stream.on('error', reject);
-      stream.on('end', () => resolve(Buffer.concat(chunks)));
-    });
-}
-
-
 // Helper to parse speech mark JSON lines
 function parseSpeechMarks(jsonLines: string): SpeechMark[] {
     if (!jsonLines) return [];
@@ -127,18 +115,17 @@ async function synthesizeChunk(pollyClient: PollyClient, textChunk: string, voic
     
     const audioStreamReadable = audioResponse.AudioStream as Readable;
     const speechMarksStreamReadable = speechMarksResponse.AudioStream as Readable;
-
-    // We need to clone the audio stream because it can only be consumed once.
-    // One clone goes to get the duration, the other to be converted to a data URI.
-    const audioBuffer = await streamToBuffer(audioStreamReadable);
-    const audioDataUri = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
-
-    const duration = (await getAudioDuration(audioBuffer)) * 1000; // get duration in milliseconds
+    
+    const audioBase64 = await streamToString(audioStreamReadable);
+    const audioDataUri = `data:audio/mp3;base64,${audioBase64}`;
     
     const speechMarksJson = await streamToString(speechMarksStreamReadable);
     const speechMarks = parseSpeechMarks(speechMarksJson);
 
-    return { audioDataUri, speechMarks, duration };
+    // Estimate duration. Average speaking rate is ~15 chars/sec. This is a rough heuristic.
+    const estimatedDuration = (textChunk.length / 15) * 1000; // in milliseconds
+
+    return { audioDataUri, speechMarks, duration: estimatedDuration };
 }
 
 
