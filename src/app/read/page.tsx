@@ -193,9 +193,10 @@ export default function ReadPage() {
     setAudioProgress(0);
   }
 
-  const handleNewDocumentClick = () => {
-      clearActiveDoc();
-  }
+  const handleUploadNewDocumentClick = () => {
+    clearActiveDoc();
+    fileInputRef.current?.click();
+  };
 
   const handleSelectDocument = async (doc: Document) => {
     clearActiveDoc();
@@ -757,6 +758,12 @@ export default function ReadPage() {
                 </div>
             </SidebarHeader>
             <SidebarContent>
+            <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleUploadNewDocumentClick}>
+                    <UploadCloud />
+                    Upload New Document
+                </SidebarMenuButton>
+            </SidebarMenuItem>
             <Separator className="my-2" />
             <div>
                 <div className="p-2 text-sm font-semibold flex items-center gap-2 text-muted-foreground">
@@ -845,7 +852,7 @@ export default function ReadPage() {
                     </div>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNewDocumentClick}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleUploadNewDocumentClick}>
                                 <PlusCircle className="h-5 w-5" />
                             </Button>
                         </TooltipTrigger>
@@ -1014,3 +1021,5 @@ export default function ReadPage() {
     </TooltipProvider>
   );
 }
+
+    
