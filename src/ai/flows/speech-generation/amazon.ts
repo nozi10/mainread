@@ -2,7 +2,6 @@
 'use server';
 import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import { Readable } from 'stream';
-import getAudioDuration from 'mp3-duration';
 
 export type SpeechMark = {
     time: number;
@@ -120,9 +119,11 @@ async function synthesizeChunk(pollyClient: PollyClient, textChunk: string, voic
     const speechMarksJson = await streamToBuffer(speechMarksResponse.AudioStream as Readable).then(b => b.toString('utf8'));
     const speechMarks = parseSpeechMarks(speechMarksJson);
 
-    const duration = await getAudioDuration(audioBuffer) * 1000; // get duration in milliseconds
-
-    return { audioDataUri, speechMarks, duration };
+    // This is an estimation. A more accurate method would be to use a library to parse the mp3 duration.
+    // Average reading speed is ~15 characters per second. 1000ms/15char = ~67ms per character.
+    const estimatedDuration = textChunk.length * 60; // A rough but workable approximation.
+    
+    return { audioDataUri, speechMarks, duration: estimatedDuration };
 }
 
 
@@ -146,32 +147,29 @@ export async function generateAmazonVoice(formattedText: string, voice: string):
     let cumulativeDuration = 0;
     let characterOffset = 0;
 
-    try {
-        for (const chunk of textChunks) {
-            const { audioDataUri, speechMarks, duration } = await synthesizeChunk(pollyClient, chunk, voice);
-            
-            allAudioDataUris.push(audioDataUri);
-            
-            const adjustedMarks = speechMarks.map(mark => ({
-                ...mark,
-                time: mark.time + cumulativeDuration, // Offset time by duration of previous chunks
-                start: mark.start + characterOffset, // Offset character position
-                end: mark.end + characterOffset
-            }));
-            allSpeechMarks.push(...adjustedMarks);
-            
-            cumulativeDuration += duration;
-            characterOffset += chunk.length + 1; // +1 for the space/newline that might be trimmed
-        }
+    const chunkPromises = textChunks.map(chunk => synthesizeChunk(pollyClient, chunk, voice));
+    const chunkResults = await Promise.all(chunkPromises);
 
-        return { 
-            audioDataUris: allAudioDataUris,
-            speechMarks: allSpeechMarks
-        };
+    for(const result of chunkResults) {
+        allAudioDataUris.push(result.audioDataUri);
+        
+        const adjustedMarks = result.speechMarks.map(mark => ({
+            ...mark,
+            time: mark.time + cumulativeDuration,
+            start: mark.start + characterOffset,
+            end: mark.end + characterOffset
+        }));
+        allSpeechMarks.push(...adjustedMarks);
 
-    } catch (error) {
-        console.error("Error with AWS Polly SDK:", error);
-        const message = error instanceof Error ? error.message : 'An unknown error occurred with Polly.';
-        throw new Error(`Polly SDK Error: ${message}`);
+        cumulativeDuration += result.duration;
+        // Find the original chunk text based on the audio URI to get accurate length for offset
+        const correspondingChunk = textChunks[allAudioDataUris.length - 1];
+        characterOffset += correspondingChunk.length;
     }
+
+
+    return { 
+        audioDataUris: allAudioDataUris,
+        speechMarks: allSpeechMarks
+    };
 }

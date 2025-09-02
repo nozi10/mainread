@@ -43,7 +43,6 @@
     "genkitx-openai": "latest",
     "jose": "^5.4.1",
     "lucide-react": "^0.383.0",
-    "mp3-duration": "^1.1.0",
     "next": "15.5.2",
     "next-themes": "^0.3.0",
     "pdfjs-dist": "3.11.174",
