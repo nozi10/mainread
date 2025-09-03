@@ -89,10 +89,16 @@ export default function AuthPage() {
                 </Button>
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex-col gap-4">
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Logging in...' : 'Login'}
               </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{' '}
+                <Link href="/contact" className="underline hover:text-primary">
+                  Request Access
+                </Link>
+              </p>
             </CardFooter>
         </form>
       </Card>
