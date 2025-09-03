@@ -2,7 +2,7 @@
 'use server';
 
 import { kv } from '@vercel/kv';
-import { del as deleteBlob } from '@vercel/blob';
+import { del as deleteBlob, put as putBlob } from '@vercel/blob';
 import { getSession, createSession, deleteSession } from './session';
 import type { User } from './db';
 import bcrypt from 'bcrypt';
@@ -41,26 +41,20 @@ export async function updateUserProfile(formData: FormData): Promise<{ success: 
     
     let avatarUrl = user.avatarUrl;
     const avatarFile = formData.get('avatar') as File;
+
     if (avatarFile && avatarFile.size > 0) {
         if (user.avatarUrl) {
-            await deleteBlob(user.avatarUrl);
+            try {
+                await deleteBlob(user.avatarUrl);
+            } catch (error) {
+                console.warn("Failed to delete old avatar, it might have been already removed:", error);
+            }
         }
-        // Use VERCEL_URL in production, otherwise fall back to the public app url.
-        const appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXT_PUBLIC_APP_URL;
-        if (!appUrl) {
-            throw new Error("Application URL is not configured. Please set NEXT_PUBLIC_APP_URL environment variable.");
-        }
-        const uploadResponse = await fetch(`${appUrl}/api/upload`, {
-            method: 'POST',
-            headers: { 'x-vercel-filename': avatarFile.name },
-            body: avatarFile,
+        
+        const blob = await putBlob(avatarFile.name, avatarFile, {
+          access: 'public',
         });
-        if (!uploadResponse.ok) {
-            const errorBody = await uploadResponse.text();
-            console.error("Upload API Error:", errorBody);
-            throw new Error('Failed to upload new avatar.');
-        }
-        const blob = await uploadResponse.json();
+        
         avatarUrl = blob.url;
     }
 
@@ -87,7 +81,7 @@ export async function updateUserProfile(formData: FormData): Promise<{ success: 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
     console.error('Failed to update profile:', message);
-    return { success: false, message };
+    return { success: false, message: "Failed to save avatar." };
   }
 }
 
