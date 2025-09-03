@@ -1,92 +1,117 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, BookOpen, Mic, BrainCircuit } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function AuthPage() {
-  const router = useRouter();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const email = formData.get('email');
-    const password = formData.get('password');
-
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      
-      const data = await response.json();
-
-      if (response.ok && data.success && data.redirectUrl) {
-        router.push(data.redirectUrl);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: data.message || "Invalid credentials",
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function LandingPage() {
   return (
-    <main className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-full max-w-sm shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-4xl font-headline text-primary">Readify</CardTitle>
-          <CardDescription>Your intelligent PDF reader</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4 pt-6">
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <BookOpen className="h-6 w-6 text-primary" />
+            <span className="text-xl font-headline font-bold">Readify</span>
+          </Link>
+          <nav>
+            <Button asChild>
+              <Link href="/login">
+                Login <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </nav>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <section className="w-full py-12 md:py-24 lg:py-32">
+          <div className="container px-4 md:px-6">
+            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline text-primary">
+                    Transform Your Documents into Audiobooks
+                  </h1>
+                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
+                    Readify intelligently converts your PDFs into natural-sounding speech. Upload, listen, and learn on the go with our AI-powered tools.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                  <Button asChild size="lg">
+                    <Link href="/login">
+                      Get Started Free
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+              <img
+                src="https://picsum.photos/seed/readify-hero/1200/800"
+                width="1200"
+                height="800"
+                alt="Hero"
+                data-ai-hint="abstract technology"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <Input id="login-email" name="email" type="email" required />
+                <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm">Key Features</div>
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Read Less, Learn More</h2>
+                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                  Our advanced AI tools help you interact with your documents in entirely new ways.
+                </p>
               </div>
-              <div className="space-y-2 relative">
-                <Label htmlFor="login-password">Password</Label>
-                <Input id="login-password" name="password" type={showPassword ? 'text' : 'password'} required />
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
-                  className="absolute bottom-1 right-1 h-7 w-7"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Logging in...' : 'Login'}
-              </Button>
-            </CardFooter>
-        </form>
-      </Card>
-    </main>
+            </div>
+            <div className="mx-auto grid max-w-5xl items-start gap-8 sm:grid-cols-2 md:gap-12 lg:grid-cols-3 lg:max-w-none mt-12">
+              <Card>
+                <CardHeader className="flex flex-col items-center text-center">
+                  <div className="mb-4 rounded-full bg-primary/10 p-4">
+                    <Mic className="h-8 w-8 text-primary" />
+                  </div>
+                  <CardTitle>AI-Powered Narration</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center text-sm text-muted-foreground">
+                  Choose from a variety of natural-sounding voices to listen to your documents, powered by cutting-edge text-to-speech technology.
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-col items-center text-center">
+                  <div className="mb-4 rounded-full bg-primary/10 p-4">
+                    <BrainCircuit className="h-8 w-8 text-primary" />
+                  </div>
+                  <CardTitle>Intelligent Analysis</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center text-sm text-muted-foreground">
+                  Instantly get summaries, key points, and glossaries. Chat with your documents and generate quizzes to test your knowledge.
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-col items-center text-center">
+                  <div className="mb-4 rounded-full bg-primary/10 p-4">
+                    <BookOpen className="h-8 w-8 text-primary" />
+                  </div>
+                  <CardTitle>Interactive Reading</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center text-sm text-muted-foreground">
+                  Experience synchronized word and sentence highlighting as you listen, keeping you focused and engaged with the content.
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Readify. All rights reserved.</p>
+      </footer>
+    </div>
   );
 }

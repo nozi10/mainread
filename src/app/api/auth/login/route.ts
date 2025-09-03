@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
     }
 
+    // if user has not completed setup, they should not be able to log in with an empty password
+    if (!user.password) {
+      console.log(`Login attempt failed: Account not set up for email ${email}`);
+      return NextResponse.json({ message: 'Account setup not complete. Please check your invitation email.' }, { status: 401 });
+    }
+
     const passwordsMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordsMatch) {

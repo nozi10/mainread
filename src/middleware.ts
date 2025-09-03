@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 
 const protectedRoutes = ['/read'];
-const publicRoutes = ['/', '/welcome', '/setup-account'];
+const publicRoutes = ['/', '/login', '/welcome', '/setup-account'];
 const adminRoutes = ['/admin']; // This now includes /admin and /admin/*
 
 export async function middleware(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function middleware(req: NextRequest) {
   
   // If the user is not logged in and is trying to access any protected page
   if (!session?.userId && (isProtectedRoute || isAdminRoute)) {
-    return NextResponse.redirect(new URL('/', req.nextUrl));
+    return NextResponse.redirect(new URL('/login', req.nextUrl));
   }
 
   // If the user is logged in
@@ -37,8 +37,8 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL(url, req.nextUrl));
     }
     
-    // If a logged-in user is on the login page, redirect them to their dashboard
-    if (path === '/') {
+    // If a logged-in user is on the login page or landing page, redirect them to their dashboard
+    if (path === '/' || path === '/login') {
       const url = session.isAdmin ? '/admin' : '/read';
       return NextResponse.redirect(new URL(url, req.nextUrl));
     }
