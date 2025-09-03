@@ -18,7 +18,7 @@ export default function LandingPage() {
           <nav className="flex items-center gap-2">
             <Button asChild>
               <Link href="/login">
-                Login <ArrowRight className="ml-2 h-4 w-4" />
+                Login
               </Link>
             </Button>
           </nav>
@@ -41,7 +41,6 @@ export default function LandingPage() {
                 <Button asChild size="lg">
                   <Link href="/contact">
                     Contact Us
-                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
               </div>
