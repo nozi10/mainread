@@ -29,14 +29,17 @@ export async function setupAccount(formData: z.infer<typeof SetupAccountSchema>)
     const { username, password, token } = validation.data;
 
     try {
-        const userByTokenKey = `readify:user:setupToken:${token}`;
-        const userByToken: User | null = await kv.get(userByTokenKey);
+        const userId: string | null = await kv.get(`readify:setup-token:${token}`);
 
-        if (!userByToken || !userByToken.setupTokenExpiry || new Date(userByToken.setupTokenExpiry) < new Date()) {
-            if(userByToken) await kv.del(userByTokenKey);
+        if (!userId) {
             return { success: false, message: 'Invalid or expired setup link. Please ask an admin to resend the invitation.' };
         }
         
+        const userToUpdate: User | null = await kv.get(`readify:user:id:${userId}`);
+        if (!userToUpdate || userToUpdate.setupToken !== token || !userToUpdate.setupTokenExpiry || new Date(userToUpdate.setupTokenExpiry) < new Date()) {
+            return { success: false, message: 'Invalid or expired setup link.' };
+        }
+
         const existingUserByUsername: User | null = await kv.get(`readify:user:username:${username}`);
         if (existingUserByUsername) {
             return { success: false, message: 'Username is already taken.' };
@@ -45,7 +48,7 @@ export async function setupAccount(formData: z.infer<typeof SetupAccountSchema>)
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const updatedUser: User = {
-            ...userByToken,
+            ...userToUpdate,
             username,
             password: hashedPassword,
             setupToken: null, // Invalidate the token
@@ -56,58 +59,11 @@ export async function setupAccount(formData: z.infer<typeof SetupAccountSchema>)
         pipeline.set(`readify:user:id:${updatedUser.id}`, updatedUser);
         pipeline.set(`readify:user:email:${updatedUser.email}`, updatedUser);
         pipeline.set(`readify:user:username:${username}`, updatedUser);
-        pipeline.del(userByTokenKey); // Clean up the token key
+        pipeline.del(`readify:setup-token:${token}`);
         
-        // Find the user by the old email key to update it, as we don't store user by token directly.
-        // We'll need to get all users and find the one with the token.
-        // Let's refine this logic. The token should point to the user id.
-        
-        // Let's adjust the user creation logic to store a token -> userId mapping.
-        // For now, let's assume we can update the user.
-        
-        const userRecord: User | null = await kv.get(`readify:user:id:${userByToken.id}`);
-        if(!userRecord) {
-             return { success: false, message: 'Could not find original user record.' };
-        }
-        
-        const finalUser: User = {
-            ...userRecord,
-            username,
-            password: hashedPassword,
-            setupToken: null,
-            setupTokenExpiry: null
-        };
-        
-        // Overwrite existing user records
-        pipeline.set(`readify:user:id:${finalUser.id}`, finalUser);
-        pipeline.set(`readify:user:email:${finalUser.email}`, finalUser);
-        pipeline.set(`readify:user:username:${finalUser.username}`, finalUser);
-        
-        const oldTokenKey = `readify:user:setupToken:${token}`;
-        const oldUser: User | null = await kv.get(oldTokenKey);
-        if(oldUser) {
-            pipeline.del(oldTokenKey); //This key should not exist.
-        }
-        const userToUpdate: User|null = await kv.get(`readify:user:id:${userByToken.id}`);
-        if (userToUpdate && userToUpdate.setupToken === token) {
-             const updated = {
-                 ...userToUpdate,
-                 username,
-                 password: hashedPassword,
-                 setupToken: null,
-                 setupTokenExpiry: null,
-             };
-             pipeline.set(`readify:user:id:${userToUpdate.id}`, updated);
-             pipeline.set(`readify:user:email:${userToUpdate.email}`, updated);
-             pipeline.set(`readify:user:username:${username}`, updated);
-        } else {
-             return { success: false, message: 'Could not verify setup token.' };
-        }
-
-
         await pipeline.exec();
         
-        await createSession(finalUser.id, finalUser.isAdmin, finalUser.username);
+        await createSession(updatedUser.id, updatedUser.isAdmin, updatedUser.username);
 
         revalidatePath('/read');
         return { success: true };
@@ -154,7 +110,7 @@ export async function setUsername(username: string): Promise<{ success: boolean;
     await pipeline.exec();
     
     // Re-create session with the new username
-    await createSession(user.id, user.isAdmin, user.username);
+    await createSession(user.id, user.isAdmin, updatedUser.username);
     
     revalidatePath('/read');
 

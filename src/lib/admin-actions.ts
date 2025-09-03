@@ -168,6 +168,7 @@ export async function createUser(userData: {
         const pipeline = kv.pipeline();
         pipeline.set(`readify:user:email:${email}`, newUser);
         pipeline.set(`readify:user:id:${userId}`, newUser);
+        pipeline.set(`readify:setup-token:${setupToken}`, userId, { ex: 24 * 60 * 60 });
         
         if (submissionId) {
             const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
@@ -283,6 +284,7 @@ export async function resendInvitation(userId: string): Promise<{success: boolea
         const pipeline = kv.pipeline();
         pipeline.set(`readify:user:id:${userId}`, updatedUser);
         pipeline.set(`readify:user:email:${user.email}`, updatedUser);
+        pipeline.set(`readify:setup-token:${setupToken}`, userId, { ex: 24 * 60 * 60 });
         await pipeline.exec();
 
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -335,7 +337,8 @@ export async function sendReply(submissionId: string, replyMessage: string): Pro
 }
 
 export async function updateSubmissionStatus(submissionId: string, status: 'Approved' | 'Rejected' | 'Pending' | 'Replied'): Promise<{ success: boolean; message?: string }> {
-    // This function can be called by non-admins (e.g., via the rejection link), so no checkAdmin() here.
+    // This function can be called by non-admins (e.g., via the rejection link), so no checkAdmin() here for that case.
+    // It's safe because it only updates the status.
     try {
         const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
         if (!submission) {
@@ -345,7 +348,7 @@ export async function updateSubmissionStatus(submissionId: string, status: 'Appr
         await kv.set(`readify:submission:${submissionId}`, submission);
         return { success: true };
     } catch(error) {
-        const message = error instanceof Error ? error.message : 'An unknown error occurred';
+        const message = error instanceof Error ? error.message : 'An unexpected error occurred';
         console.error(`Failed to update status for ${submissionId}:`, message);
         return { success: false, message };
     }
