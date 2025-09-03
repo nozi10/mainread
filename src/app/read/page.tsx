@@ -769,86 +769,79 @@ export default function ReadPage() {
                     Upload New Document
                 </SidebarMenuButton>
             </SidebarMenuItem>
+            
             <Separator className="my-2" />
-            <div>
-                <div className="p-2 text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-                    <Settings />
-                    Audio Settings
+
+            <div className="p-2 space-y-4">
+                <div className='space-y-2'>
+                    <Label>Voice</Label>
+                    <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isSpeaking || generationState === 'generating'}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a voice"/>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(groupedVoices).map(([provider, voices]) => (
+                              <SelectGroup key={provider}>
+                                  <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{provider.toUpperCase()}</Label>
+                                  {voices.map((voice) => (
+                                  <div key={voice.name} className="flex items-center justify-between pr-2">
+                                      <SelectItem value={voice.name} className="flex-1">
+                                          {voice.displayName} ({voice.gender})
+                                      </SelectItem>
+                                      <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-7 w-7 ml-2 shrink-0"
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              handlePreviewVoice(voice.name);
+                                          }}
+                                          aria-label={`Preview voice ${voice.name}`}
+                                      >
+                                          <Volume2 className="h-4 w-4" />
+                                      </Button>
+                                  </div>
+                                  ))}
+                              </SelectGroup>
+                          ))}
+                        </SelectContent>
+                    </Select>
                 </div>
-                <div className="p-2 space-y-4">
-                    <div className='space-y-2'>
-                        <Label>Voice</Label>
-                        <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isSpeaking || generationState === 'generating'}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a voice"/>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(groupedVoices).map(([provider, voices]) => (
-                                  <SelectGroup key={provider}>
-                                      <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{provider.toUpperCase()}</Label>
-                                      {voices.map((voice) => (
-                                      <div key={voice.name} className="flex items-center justify-between pr-2">
-                                          <SelectItem value={voice.name} className="flex-1">
-                                              {voice.displayName} ({voice.gender})
-                                          </SelectItem>
-                                          <Button 
-                                              variant="ghost" 
-                                              size="icon" 
-                                              className="h-7 w-7 ml-2 shrink-0"
-                                              onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handlePreviewVoice(voice.name);
-                                              }}
-                                              aria-label={`Preview voice ${voice.name}`}
-                                          >
-                                              <Volume2 className="h-4 w-4" />
-                                          </Button>
-                                      </div>
-                                      ))}
-                                  </SelectGroup>
-                              ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className='space-y-2'>
-                        <Label htmlFor="speaking-rate">Speaking Rate: {speakingRate.toFixed(2)}x</Label>
-                        <Slider id="speaking-rate" min={0.25} max={4.0} step={0.25} value={[speakingRate]} onValueChange={(v) => setSpeakingRate(v[0])} disabled={isSpeaking || generationState === 'generating'} />
-                    </div>
+                <div className='space-y-2'>
+                    <Label htmlFor="speaking-rate">Speaking Rate: {speakingRate.toFixed(2)}x</Label>
+                    <Slider id="speaking-rate" min={0.25} max={4.0} step={0.25} value={[speakingRate]} onValueChange={(v) => setSpeakingRate(v[0])} disabled={isSpeaking || generationState === 'generating'} />
                 </div>
             </div>
 
             <Separator className="my-2" />
-            <div>
-            <div className="p-2 text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-                <Bot />
-                AI Tools
-            </div>
-                <SidebarMenuItem>
+
+            <SidebarMenuItem>
                 <SidebarMenuButton onClick={() => handleAiAction('summary')} disabled={!documentText}>
                     <Lightbulb />
                     Summarize & Key Points
                 </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => handleAiAction('glossary')} disabled={!documentText}>
-                    <BookOpenCheck />
-                    Create Glossary
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => handleAiAction('glossary')} disabled={!documentText}>
+                <BookOpenCheck />
+                Create Glossary
+            </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleAiAction('quiz')} disabled={!documentText}>
+                    <BrainCircuit />
+                    {activeDoc?.quizAttempt ? 'Review Quiz' : 'Generate Quiz'}
                 </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => handleAiAction('quiz')} disabled={!documentText}>
-                        <BrainCircuit />
-                        {activeDoc?.quizAttempt ? 'Review Quiz' : 'Generate Quiz'}
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setIsChatOpen(true)} disabled={!documentText}>
-                    <MessageSquare />
-                    Chat with Document
-                </SidebarMenuButton>
-                </SidebarMenuItem>
-            </div>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setIsChatOpen(true)} disabled={!documentText}>
+                <MessageSquare />
+                Chat with Document
+            </SidebarMenuButton>
+            </SidebarMenuItem>
+            
             <Separator className="my-2" />
+
             <div>
                  <div className="flex justify-between items-center p-2 text-sm font-semibold text-muted-foreground">
                     <div className="flex items-center gap-2">
@@ -918,6 +911,7 @@ export default function ReadPage() {
             <SidebarFooter>
             {isAdmin && (
                 <>
+                    <Separator />
                     <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton onClick={() => router.push('/admin')}>
@@ -926,7 +920,6 @@ export default function ReadPage() {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                     </SidebarMenu>
-                    <Separator />
                 </>
                 )}
             <div className="flex items-center gap-3 p-2">
