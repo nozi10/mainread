@@ -288,7 +288,7 @@ export default function AdminPage() {
                 <CardHeader className="flex items-center gap-2 flex-row">
                     <FileText />
                     <CardTitle>Document Management</CardTitle>
-                </Header>
+                </CardHeader>
                 <CardContent>
                 <Table>
                     <TableHeader>
