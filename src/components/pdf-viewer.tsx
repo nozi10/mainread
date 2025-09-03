@@ -8,8 +8,8 @@ import 'react-pdf/dist/esm/Page/TextLayer.css';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
-// Set up the worker with the correct URL
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configure the worker to be loaded from the public/static directory
+pdfjs.GlobalWorkerOptions.workerSrc = `/static/pdf.worker.min.js`;
 
 export type Highlight = {
   start: number;

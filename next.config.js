@@ -1,5 +1,8 @@
 
 require('dotenv').config();
+const path = require('path');
+const CopyPlugin = require('copy-webpack-plugin');
+
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -19,12 +22,24 @@ const nextConfig = {
       },
     ],
   },
-  serverActions: {
-    // Increase timeout for long-running AI operations like speech generation
-    bodySizeLimit: '4.5mb',
-    // Hobby tier on Vercel has a 15s timeout, Pro has much longer. 
-    // Setting to 120s for robustness, but Pro tier is recommended for heavy use.
-    executionTimeout: 120, 
+  webpack: (config) => {
+    // Aliases to handle module resolution issues in a Next.js environment
+    config.resolve.alias.canvas = false;
+    config.resolve.alias.encoding = false;
+
+    // Copy the pdf.worker.min.js file to the static directory
+    config.plugins.push(
+        new CopyPlugin({
+            patterns: [
+                {
+                    from: path.join(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.min.js'),
+                    to: path.join(__dirname, 'public/static'),
+                },
+            ],
+        })
+    );
+    
+    return config;
   },
 };
 
