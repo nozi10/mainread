@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -32,14 +32,16 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const { toast } = useToast();
-  const highlightRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (highlightRef.current) {
-        highlightRef.current.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-        });
+    if (highlight) {
+        const highlightedElement = document.getElementById('current-highlight');
+        if (highlightedElement) {
+            highlightedElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+        }
     }
   }, [highlight]);
 
@@ -83,7 +85,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
             {part}
             {index < parts.length - 1 && (
               <mark 
-                ref={highlightRef}
+                id="current-highlight"
                 className={type === 'word' ? 'bg-accent/70' : 'bg-primary/30'}
               >
                 {highlightText}
