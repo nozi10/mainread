@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Settings, LogOut } from 'lucide-react';
+import { Settings, LogOut, User as UserIcon } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import type { UserSession } from '@/lib/db';
@@ -41,21 +41,11 @@ const UserPanel: React.FC<UserPanelProps> = ({ session, onLogout, onUpdate }) =>
             <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
                 <div className="flex items-center gap-3 p-2">
                     <DialogTrigger asChild>
-                        <button className="flex-shrink-0">
-                            <Avatar>
-                                <AvatarImage src={session.avatarUrl || undefined} data-ai-hint="user avatar" />
-                                <AvatarFallback>{session.name?.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                        </button>
+                        <SidebarMenuButton className="flex-1 justify-start">
+                           <UserIcon />
+                           Account
+                        </SidebarMenuButton>
                     </DialogTrigger>
-                    <div className="flex-1 overflow-hidden">
-                        <DialogTrigger asChild>
-                             <button className="w-full text-left">
-                                <p className="text-sm font-medium truncate hover:underline">{session.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{session.email}</p>
-                            </button>
-                        </DialogTrigger>
-                    </div>
                     <Button onClick={onLogout} variant="ghost" size="icon">
                         <LogOut className="h-5 w-5"/>
                         <span className="sr-only">Log out</span>
