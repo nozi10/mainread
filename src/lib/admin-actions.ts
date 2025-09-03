@@ -47,9 +47,8 @@ export async function getAllUsers(): Promise<User[]> {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export async function getAllDocuments(isStaging: boolean = false): Promise<DocumentWithAuthorEmail[]> {
+export async function getAllDocuments(): Promise<DocumentWithAuthorEmail[]> {
     await checkAdmin();
-    const prefix = isStaging ? 'readify:staging' : 'readify';
 
     const users = await getAllUsers();
     const userEmailMap = new Map(users.map(u => [u.id, u.email]));
@@ -66,7 +65,7 @@ export async function getAllDocuments(isStaging: boolean = false): Promise<Docum
     }
     
     const pipeline = kv.pipeline();
-    userIds.forEach(userId => pipeline.lrange(`${prefix}:user:${userId}:docs`, 0, -1));
+    userIds.forEach(userId => pipeline.lrange(`readify:user:${userId}:docs`, 0, -1));
     const allDocIdLists = await pipeline.exec() as string[][];
     
     const allDocIds = allDocIdLists.flat();
@@ -77,7 +76,7 @@ export async function getAllDocuments(isStaging: boolean = false): Promise<Docum
         return [];
     }
     
-    const docKeys = uniqueDocIds.map(id => `${prefix}:doc:${id}`);
+    const docKeys = uniqueDocIds.map(id => `readify:doc:${id}`);
     const allDocs = await kv.mget<Document[]>(...docKeys);
     
     const validDocs = allDocs.filter((d): d is Document => d !== null);
@@ -105,29 +104,18 @@ export async function deleteUser(userId: string): Promise<{ success: boolean; me
     }
 
     const pipeline = kv.pipeline();
-
-    // Delete both production and staging documents
-    const prodDocListKey = `readify:user:${userId}:docs`;
-    const stagingDocListKey = `readify:staging:user:${userId}:docs`;
-    const [prodDocIds, stagingDocIds] = await Promise.all([
-        kv.lrange(prodDocListKey, 0, -1),
-        kv.lrange(stagingDocListKey, 0, -1),
-    ]);
-
-    const allDocIds = [...(prodDocIds || []), ...(stagingDocIds || [])];
+    const docListKey = `readify:user:${userId}:docs`;
+    const docIds: string[] | null = await kv.lrange(docListKey, 0, -1);
     
-    if (allDocIds.length > 0) {
-      const validDocIds = allDocIds.filter(id => id);
+    if (docIds && docIds.length > 0) {
+      const validDocIds = docIds.filter(id => id);
       if (validDocIds.length > 0) {
-        const prodDocKeysToDelete = (prodDocIds || []).filter(id => id).map(id => `readify:doc:${id}`);
-        const stagingDocKeysToDelete = (stagingDocIds || []).filter(id => id).map(id => `readify:staging:doc:${id}`);
-        if (prodDocKeysToDelete.length > 0) pipeline.del(...prodDocKeysToDelete);
-        if (stagingDocKeysToDelete.length > 0) pipeline.del(...stagingDocKeysToDelete);
+        const docKeysToDelete = validDocIds.map(id => `readify:doc:${id}`);
+        pipeline.del(...docKeysToDelete);
       }
     }
     
-    pipeline.del(prodDocListKey);
-    pipeline.del(stagingDocListKey);
+    pipeline.del(docListKey);
     pipeline.del(`readify:user:id:${userId}`);
     if (user.username) {
         pipeline.del(`readify:user:username:${user.username}`);
@@ -195,15 +183,11 @@ export async function createUser(userData: {
 export async function deleteDocumentAsAdmin(docId: string): Promise<{ success: boolean; message?: string }> {
     await checkAdmin();
     try {
-        // Try deleting from both staging and prod
-        const prodResult = await dbDeleteDocument(docId, false);
-        const stagingResult = await dbDeleteDocument(docId, true);
-        
-        // If either succeeded (or if it was already deleted), count as success
-        if (prodResult.success || stagingResult.success) {
+        const result = await dbDeleteDocument(docId);
+        if (result.success) {
              return { success: true };
         }
-        return { success: false, message: 'Document not found in any environment.'};
+        return { success: false, message: 'Document not found.'};
 
     } catch (error) {
         const message = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -218,14 +202,10 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     const users = await getAllUsers();
     
     // Fetch documents from both environments
-    const prodDocs = await getAllDocuments(false);
-    const stagingDocs = await getAllDocuments(true);
-    const allDocs = [...prodDocs, ...stagingDocs];
-    const uniqueDocs = Array.from(new Map(allDocs.map(doc => [doc.id, doc])).values());
-
+    const allDocs = await getAllDocuments();
 
     const newUsersLast30Days = users.filter(u => new Date(u.createdAt) > thirtyDaysAgo).length;
-    const docsUploadedLast30Days = uniqueDocs.filter(d => new Date(d.createdAt) > thirtyDaysAgo).length;
+    const docsUploadedLast30Days = allDocs.filter(d => new Date(d.createdAt) > thirtyDaysAgo).length;
 
     // User signups by week
     const userSignupsByWeek: { [week: string]: number } = {};
@@ -242,7 +222,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 
     // Top users by doc count
     const docCounts: { [userId: string]: number } = {};
-    uniqueDocs.forEach(doc => {
+    allDocs.forEach(doc => {
         docCounts[doc.userId] = (docCounts[doc.userId] || 0) + 1;
     });
     
@@ -260,7 +240,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 
     return {
         totalUsers: users.length,
-        totalDocuments: uniqueDocs.length,
+        totalDocuments: allDocs.length,
         newUsersLast30Days,
         docsUploadedLast30Days,
         userSignupsByWeek: formattedSignups,
@@ -303,5 +283,3 @@ export async function resendInvitation(userId: string): Promise<{success: boolea
         return { success: false, message };
     }
 }
-
-    

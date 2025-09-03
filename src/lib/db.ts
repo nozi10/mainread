@@ -63,13 +63,9 @@ export interface UserSession extends SessionPayload {
     defaultZoomLevel?: number | null;
 }
 
-// Helper function to get the correct key prefix
-const getKeyPrefix = (isStaging: boolean) => (isStaging ? 'readify:staging' : 'readify');
-
 export async function getUserSession(): Promise<UserSession | null> {
   const session = await getSession();
   if (session?.userId) {
-    // User data is not staged, so we always fetch from production keys.
     const user: User | null = await kv.get(`readify:user:id:${session.userId}`);
     if (user) {
         return {
@@ -86,13 +82,13 @@ export async function getUserSession(): Promise<UserSession | null> {
   return null;
 }
 
-export async function saveDocument(docData: Partial<Document>, isStaging: boolean = false): Promise<Document> {
+export async function saveDocument(docData: Partial<Document>): Promise<Document> {
   const session = await getSession();
   if (!session?.userId) {
     throw new Error('Authentication required.');
   }
   const userId = session.userId;
-  const prefix = getKeyPrefix(isStaging);
+  const prefix = 'readify';
 
   let docId = docData.id;
   const userDocListKey = `${prefix}:user:${userId}:docs`;
@@ -143,13 +139,13 @@ export async function saveDocument(docData: Partial<Document>, isStaging: boolea
   }
 }
 
-export async function getDocuments(isStaging: boolean = false): Promise<Document[]> {
+export async function getDocuments(): Promise<Document[]> {
   const session = await getSession();
   if (!session?.userId) {
     return [];
   }
   const userId = session.userId;
-  const prefix = getKeyPrefix(isStaging);
+  const prefix = 'readify';
   const userDocListKey = `${prefix}:user:${userId}:docs`;
 
   const docIds = await kv.lrange<string[]>(userDocListKey, 0, -1);
@@ -170,12 +166,12 @@ export async function getDocuments(isStaging: boolean = false): Promise<Document
     .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export async function deleteDocument(docId: string, isStaging: boolean = false): Promise<{ success: boolean, message?: string }> {
+export async function deleteDocument(docId: string): Promise<{ success: boolean, message?: string }> {
     const session = await getSession();
     if (!session?.userId) {
         throw new Error('Authentication required.');
     }
-    const prefix = getKeyPrefix(isStaging);
+    const prefix = 'readify';
 
     try {
         const docKey = `${prefix}:doc:${docId}`;
@@ -213,12 +209,12 @@ export async function deleteDocument(docId: string, isStaging: boolean = false):
     }
 }
 
-export async function clearChatHistory(docId: string, isStaging: boolean = false): Promise<Document> {
+export async function clearChatHistory(docId: string): Promise<Document> {
     const session = await getSession();
     if (!session?.userId) {
         throw new Error('Authentication required.');
     }
-    const prefix = getKeyPrefix(isStaging);
+    const prefix = 'readify';
     const docKey = `${prefix}:doc:${docId}`;
     const doc: Document | null = await kv.get(docKey);
 
@@ -239,5 +235,3 @@ export async function clearChatHistory(docId: string, isStaging: boolean = false
 
     return updatedDoc;
 }
-
-    

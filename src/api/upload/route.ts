@@ -29,11 +29,7 @@ export async function POST(request: NextRequest) {
   // Use a unique identifier for the user folder, which is the userId.
   const userIdentifier = session.userId;
   const docId = request.headers.get('x-doc-id') || randomUUID();
-  const isStaging = request.headers.get('x-is-staging') === 'true';
-  
-  // Conditionally add a 'staging' path prefix
-  const stagingPrefix = isStaging ? 'staging/' : '';
-  const blobName = `readify/${stagingPrefix}${userIdentifier}/${docId}-${originalFilename}`;
+  const blobName = `readify/${userIdentifier}/${docId}-${originalFilename}`;
 
   try {
     const blob = await put(blobName, request.body, {
@@ -51,5 +47,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-    
