@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn } from 'lucide-react';
+import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn, Inbox } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import AddUserDialog from '@/components/add-user-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TooltipProvider, Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import AdminInbox from '@/components/admin-inbox';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
-  const [prefilledUserData, setPrefilledUserData] = useState<{name: string, email: string} | null>(null);
+  const [prefilledUserData, setPrefilledUserData] = useState<{name: string, email: string, submissionId?: string} | null>(null);
 
   const fetchAdminData = async () => {
     setIsLoading(true);
@@ -55,8 +56,9 @@ export default function AdminPage() {
     if (action === 'addUser') {
         const name = searchParams.get('name');
         const email = searchParams.get('email');
+        const submissionId = searchParams.get('submissionId') || undefined;
         if (name && email) {
-            setPrefilledUserData({ name, email });
+            setPrefilledUserData({ name, email, submissionId });
             setIsAddUserOpen(true);
             // Clean up URL
             router.replace('/admin', { scroll: false });
@@ -171,6 +173,7 @@ export default function AdminPage() {
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="documents">Document Management</TabsTrigger>
+            <TabsTrigger value="inbox">Inbox</TabsTrigger>
           </TabsList>
           
           <TabsContent value="dashboard" className="pt-6">
@@ -356,6 +359,11 @@ export default function AdminPage() {
                 </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="inbox" className="pt-6">
+             <AdminInbox />
+          </TabsContent>
+
         </Tabs>
       </main>
     </div>

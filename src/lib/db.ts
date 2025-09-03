@@ -63,6 +63,17 @@ export interface UserSession extends SessionPayload {
     defaultZoomLevel?: number | null;
 }
 
+export interface Submission {
+    id: string;
+    type: 'Access Request' | 'General Inquiry';
+    name: string;
+    email: string;
+    message: string;
+    status: 'Pending' | 'Approved' | 'Rejected' | 'Replied';
+    createdAt: string;
+}
+
+
 export async function getUserSession(): Promise<UserSession | null> {
   const session = await getSession();
   if (session?.userId) {

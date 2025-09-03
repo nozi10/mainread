@@ -2,14 +2,15 @@
 import { kv } from '@vercel/kv';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendRejectionEmail } from '@/lib/email';
+import { updateSubmissionStatus } from '@/lib/admin-actions';
+import type { Submission } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
-  const email = searchParams.get('email');
 
-  if (!token || !email) {
-    return new NextResponse('<h1>Invalid Request</h1><p>Missing token or email.</p>', {
+  if (!token) {
+    return new NextResponse('<h1>Invalid Request</h1><p>Missing token.</p>', {
       status: 400,
       headers: { 'Content-Type': 'text/html' },
     });
@@ -17,17 +18,28 @@ export async function GET(request: NextRequest) {
 
   try {
     const tokenKey = `readify:rejection-token:${token}`;
-    const storedEmail = await kv.get(tokenKey);
+    const submissionId: string | null = await kv.get(tokenKey);
 
-    if (storedEmail !== email) {
+    if (!submissionId) {
       return new NextResponse('<h1>Invalid or Expired Link</h1><p>This rejection link is either invalid or has expired.</p>', {
         status: 400,
         headers: { 'Content-Type': 'text/html' },
       });
     }
+    
+    const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
+    if(!submission) {
+        return new NextResponse('<h1>Invalid Submission</h1><p>The submission associated with this link could not be found.</p>', {
+          status: 404,
+          headers: { 'Content-Type': 'text/html' },
+        });
+    }
 
     // Send the rejection email
-    await sendRejectionEmail(email);
+    await sendRejectionEmail(submission.email);
+
+    // Update submission status to 'Rejected'
+    await updateSubmissionStatus(submissionId, 'Rejected');
 
     // Invalidate the token by deleting it
     await kv.del(tokenKey);

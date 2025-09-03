@@ -3,12 +3,13 @@
 
 import { kv } from '@vercel/kv';
 import { getSession } from './session';
-import type { User as DbUser, Document as DbDocument } from './db';
+import type { User as DbUser, Document as DbDocument, Submission } from './db';
 import { randomUUID } from 'crypto';
 import { deleteDocument as dbDeleteDocument } from './db';
-import { sendWelcomeEmail } from './email';
+import { sendWelcomeEmail, sendAdminReplyEmail } from './email';
 
 export interface Document extends DbDocument {}
+export interface AdminSubmission extends Submission {}
 
 export interface DocumentWithAuthorEmail extends Document {
     ownerEmail: string;
@@ -32,6 +33,7 @@ async function checkAdmin() {
   if (!session?.isAdmin) {
     throw new Error('Unauthorized: Admin access required.');
   }
+  return session;
 }
 
 export async function getAllUsers(): Promise<User[]> {
@@ -136,7 +138,7 @@ export async function createUser(userData: {
     name: string;
     email: string;
     role: 'Admin' | 'User';
-}): Promise<{ success: boolean, message?: string }> {
+}, submissionId?: string): Promise<{ success: boolean, message?: string }> {
     await checkAdmin();
 
     try {
@@ -166,6 +168,15 @@ export async function createUser(userData: {
         const pipeline = kv.pipeline();
         pipeline.set(`readify:user:email:${email}`, newUser);
         pipeline.set(`readify:user:id:${userId}`, newUser);
+        
+        if (submissionId) {
+            const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
+            if (submission) {
+                submission.status = 'Approved';
+                pipeline.set(`readify:submission:${submissionId}`, submission);
+            }
+        }
+        
         await pipeline.exec();
         
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -285,3 +296,58 @@ export async function resendInvitation(userId: string): Promise<{success: boolea
         return { success: false, message };
     }
 }
+
+export async function getSubmissions(): Promise<Submission[]> {
+    await checkAdmin();
+    const submissionIds = await kv.lrange('readify:submissions', 0, -1);
+    if (!submissionIds || submissionIds.length === 0) return [];
+    
+    const submissions = await kv.mget<Submission[]>(...submissionIds.map(id => `readify:submission:${id}`));
+    return submissions.filter((s): s is Submission => s !== null)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function sendReply(submissionId: string, replyMessage: string): Promise<{ success: boolean; message?: string }> {
+    const session = await checkAdmin();
+
+    try {
+        const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
+        if (!submission) {
+            throw new Error('Submission not found.');
+        }
+
+        await sendAdminReplyEmail({
+            to: submission.email,
+            fromName: session.name,
+            originalMessage: submission.message,
+            replyMessage,
+        });
+
+        submission.status = 'Replied';
+        await kv.set(`readify:submission:${submissionId}`, submission);
+        
+        return { success: true };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error('Failed to send reply:', message);
+        return { success: false, message };
+    }
+}
+
+export async function updateSubmissionStatus(submissionId: string, status: 'Approved' | 'Rejected' | 'Pending' | 'Replied'): Promise<{ success: boolean; message?: string }> {
+    await checkAdmin();
+    try {
+        const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
+        if (!submission) {
+            throw new Error('Submission not found.');
+        }
+        submission.status = status;
+        await kv.set(`readify:submission:${submissionId}`, submission);
+        return { success: true };
+    } catch(error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error(`Failed to update status for ${submissionId}:`, message);
+        return { success: false, message };
+    }
+}
+

@@ -4,7 +4,7 @@
 import { kv } from '@vercel/kv';
 import { revalidatePath } from 'next/cache';
 import { getSession, createSession } from './session';
-import type { User } from './db';
+import type { User, Submission } from './db';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { sendContactFormEmail, sendGeneralEmail } from './email';
@@ -172,6 +172,23 @@ const contactFormSchema = z.object({
   message: z.string().min(10),
 });
 
+async function saveSubmission(
+    type: 'Access Request' | 'General Inquiry',
+    data: { name: string, email: string, message: string }
+): Promise<Submission> {
+    const submission: Submission = {
+        id: randomUUID(),
+        type,
+        status: 'Pending',
+        ...data,
+        createdAt: new Date().toISOString(),
+    };
+    await kv.set(`readify:submission:${submission.id}`, submission);
+    await kv.lpush('readify:submissions', submission.id);
+    return submission;
+}
+
+
 export async function sendContactMessage(formData: { name: string; email: string; message: string; }): Promise<{ success: boolean; message?: string }> {
   const validation = contactFormSchema.safeParse(formData);
 
@@ -183,13 +200,13 @@ export async function sendContactMessage(formData: { name: string; email: string
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   
   try {
-    // Generate a secure token for the rejection link
-    const rejectionToken = randomUUID();
-    // Store the token with the user's email, with a 7-day expiry
-    await kv.set(`readify:rejection-token:${rejectionToken}`, email, { ex: 7 * 24 * 60 * 60 });
+    const submission = await saveSubmission('Access Request', { name, email, message });
     
-    const approveUrl = `${appUrl}/admin?action=addUser&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
-    const rejectUrl = `${appUrl}/api/reject-request?token=${rejectionToken}&email=${encodeURIComponent(email)}`;
+    const rejectionToken = randomUUID();
+    await kv.set(`readify:rejection-token:${rejectionToken}`, submission.id, { ex: 7 * 24 * 60 * 60 });
+    
+    const approveUrl = `${appUrl}/admin?action=addUser&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&submissionId=${submission.id}`;
+    const rejectUrl = `${appUrl}/api/reject-request?token=${rejectionToken}`;
 
     await sendContactFormEmail({ name, email, message, approveUrl, rejectUrl });
 
@@ -211,6 +228,7 @@ export async function sendGeneralContactMessage(formData: { name: string; email:
   const { name, email, message } = validation.data;
 
   try {
+    await saveSubmission('General Inquiry', { name, email, message });
     await sendGeneralEmail({ name, email, message });
     return { success: true };
   } catch (error) {

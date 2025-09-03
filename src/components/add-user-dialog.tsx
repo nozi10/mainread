@@ -41,7 +41,7 @@ type AddUserDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   onUserAdded: () => void;
-  prefilledData?: { name: string; email: string } | null;
+  prefilledData?: { name: string; email: string; submissionId?: string } | null;
 };
 
 export default function AddUserDialog({ isOpen, onClose, onUserAdded, prefilledData }: AddUserDialogProps) {
@@ -76,7 +76,7 @@ export default function AddUserDialog({ isOpen, onClose, onUserAdded, prefilledD
   const onSubmit = async (values: AddUserFormValues) => {
     setIsLoading(true);
     try {
-      const result = await createUser(values);
+      const result = await createUser(values, prefilledData?.submissionId);
       if (result.success) {
         toast({
           title: 'Success',

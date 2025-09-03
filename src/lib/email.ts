@@ -6,6 +6,7 @@ import { WelcomeEmail } from '@/components/emails/welcome-email';
 import { ContactFormEmail } from '@/components/emails/contact-form-email';
 import { RejectionEmail } from '@/components/emails/rejection-email';
 import { GeneralContactFormEmail } from '@/components/emails/general-contact-form-email';
+import { AdminReplyEmail } from '@/components/emails/admin-reply-email';
 
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -114,3 +115,27 @@ export async function sendRejectionEmail(to: string) {
       throw new Error(`Failed to send rejection email: ${message}`);
     }
   }
+
+
+export async function sendAdminReplyEmail({ to, fromName, originalMessage, replyMessage }: { to: string, fromName: string, originalMessage: string, replyMessage: string }) {
+    try {
+        const { data, error } = await resend.emails.send({
+            from: `${fromName} (Readify Admin) <${fromEmail}>`,
+            to,
+            subject: 'Re: Your Inquiry to Readify',
+            react: AdminReplyEmail({ originalMessage, replyMessage }),
+        });
+
+        if (error) {
+            throw new Error(`Resend failed: ${error.message}`);
+        }
+
+        console.log('Admin reply email sent successfully:', data?.id);
+        return data;
+    } catch (error) {
+        console.error('Error in sendAdminReplyEmail:', error);
+        const message = error instanceof Error ? error.message : JSON.stringify(error);
+        throw new Error(`Failed to send admin reply email: ${message}`);
+    }
+}
+
