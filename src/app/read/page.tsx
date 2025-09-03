@@ -28,10 +28,20 @@ import { ChatWindow } from '@/components/chat-window';
 import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
 import { cleanPdfText } from '@/ai/flows/clean-text-flow';
 import { generateSpeech } from '@/ai/flows/generate-speech';
-import PdfViewer, { Highlight } from '@/components/pdf-viewer';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { SpeechMark } from '@/ai/schemas';
 import UserPanel from '@/components/user-panel';
+import dynamic from 'next/dynamic';
+
+const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 bg-muted/50 rounded-lg">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-xl font-semibold">Loading Document Viewer...</p>
+    </div>
+  )
+});
 
 type GenerationState = 'idle' | 'generating' | 'error';
 type ActiveDocument = Document;
@@ -65,7 +75,7 @@ export default function ReadPage() {
   
   const [documentText, setDocumentText] = useState('');
   const [speechMarks, setSpeechMarks] = useState<SpeechMark[]>([]);
-  const [currentHighlight, setCurrentHighlight] = useState<Highlight | null>(null);
+  const [currentHighlight, setCurrentHighlight] = useState<any | null>(null);
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
@@ -335,7 +345,7 @@ export default function ReadPage() {
       const currentWord = speechMarks.find(mark => mark.type === 'word' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 10));
       const currentSentence = speechMarks.find(mark => mark.type === 'sentence' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 20));
       
-      let newHighlight: Highlight | null = null;
+      let newHighlight: any | null = null;
       if (currentWord) {
           newHighlight = { type: 'word', start: currentWord.start, end: currentWord.end };
       } else if (currentSentence) {
@@ -382,7 +392,7 @@ export default function ReadPage() {
           };
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      const errorMessage = error instanceof Error ? 'An unknown error occurred' : 'An unknown error occurred';
       toast({ variant: "destructive", title: "Audio Error", description: `Could not play response: ${errorMessage}` });
     }
   };
@@ -956,3 +966,5 @@ export default function ReadPage() {
     </TooltipProvider>
   );
 }
+
+    
