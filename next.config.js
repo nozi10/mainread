@@ -35,6 +35,10 @@ const nextConfig = {
                     from: path.join(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.min.js'),
                     to: path.join(__dirname, 'public/static'),
                 },
+                {
+                    from: path.join(__dirname, 'node_modules/pdfjs-dist/build/pdf.min.js'),
+                    to: path.join(__dirname, 'public/static'),
+                },
             ],
         })
     );

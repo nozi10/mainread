@@ -593,6 +593,13 @@ export default function ReadPage() {
     setUploadStage('uploading');
 
     try {
+        if (typeof window === 'undefined' || !(window as any).pdfjsLib) {
+            toast({ variant: "destructive", title: "Library not ready", description: "PDF processing library is not loaded yet. Please try again in a moment." });
+            setUploadStage('error');
+            setIsUploading(false);
+            return;
+        }
+
         // Step 1: Upload to Vercel Blob
         const uploadResponse = await fetch('/api/upload', {
             method: 'POST',
@@ -605,6 +612,7 @@ export default function ReadPage() {
 
         // Step 2: Extract text from PDF
         setUploadStage('extracting');
+        (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdf.worker.min.js';
         const pdf = await (window as any).pdfjsLib.getDocument(blob.url).promise;
         const numPages = pdf.numPages;
         let rawText = '';
@@ -966,5 +974,3 @@ export default function ReadPage() {
     </TooltipProvider>
   );
 }
-
-    
