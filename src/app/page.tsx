@@ -16,11 +16,6 @@ export default function LandingPage() {
             <span className="text-xl font-headline font-bold">Readify</span>
           </Link>
           <nav className="flex items-center gap-2">
-             <Button asChild variant="ghost">
-              <Link href="/contact">
-                Contact
-              </Link>
-            </Button>
             <Button asChild>
               <Link href="/login">
                 Login <ArrowRight className="ml-2 h-4 w-4" />
@@ -44,8 +39,8 @@ export default function LandingPage() {
               </div>
               <div className="flex flex-col gap-2 min-[400px]:flex-row pt-4">
                 <Button asChild size="lg">
-                  <Link href="/login">
-                    Get Started Free
+                  <Link href="/contact">
+                    Contact Us
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -104,8 +99,13 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center justify-between px-4 md:px-6 border-t">
         <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Readify. All rights reserved.</p>
+        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
+          <Link className="text-xs hover:underline underline-offset-4" href="/contact">
+            Contact Us
+          </Link>
+        </nav>
       </footer>
     </div>
   );
