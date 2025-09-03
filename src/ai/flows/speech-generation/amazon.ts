@@ -2,6 +2,7 @@
 'use server';
 import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import { Readable } from 'stream';
+import getMP3Duration from 'get-mp3-duration';
 
 export type SpeechMark = {
     time: number;
@@ -118,12 +119,10 @@ async function synthesizeChunk(pollyClient: PollyClient, textChunk: string, voic
     
     const speechMarksJson = await streamToBuffer(speechMarksResponse.AudioStream as Readable).then(b => b.toString('utf8'));
     const speechMarks = parseSpeechMarks(speechMarksJson);
-
-    // This is an estimation. A more accurate method would be to use a library to parse the mp3 duration.
-    // Average reading speed is ~15 characters per second. 1000ms/15char = ~67ms per character.
-    const estimatedDuration = textChunk.length * 60; // A rough but workable approximation.
     
-    return { audioDataUri, speechMarks, duration: estimatedDuration };
+    const duration = getMP3Duration(audioBuffer);
+
+    return { audioDataUri, speechMarks, duration };
 }
 
 
@@ -147,10 +146,10 @@ export async function generateAmazonVoice(formattedText: string, voice: string):
     let cumulativeDuration = 0;
     let characterOffset = 0;
 
-    const chunkPromises = textChunks.map(chunk => synthesizeChunk(pollyClient, chunk, voice));
-    const chunkResults = await Promise.all(chunkPromises);
-
-    for(const result of chunkResults) {
+    for (let i = 0; i < textChunks.length; i++) {
+        const chunk = textChunks[i];
+        const result = await synthesizeChunk(pollyClient, chunk, voice);
+        
         allAudioDataUris.push(result.audioDataUri);
         
         const adjustedMarks = result.speechMarks.map(mark => ({
@@ -161,10 +160,11 @@ export async function generateAmazonVoice(formattedText: string, voice: string):
         }));
         allSpeechMarks.push(...adjustedMarks);
 
+        // Use precise duration for the next offset
         cumulativeDuration += result.duration;
-        // Find the original chunk text based on the audio URI to get accurate length for offset
-        const correspondingChunk = textChunks[allAudioDataUris.length - 1];
-        characterOffset += correspondingChunk.length;
+        
+        // Use the actual chunk length for the character offset
+        characterOffset += chunk.length;
     }
 
 
