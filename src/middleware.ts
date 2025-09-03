@@ -2,13 +2,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 
-const protectedRoutes = ['/read', '/profile'];
-const publicRoutes = ['/', '/welcome'];
+const protectedRoutes = ['/read'];
+const publicRoutes = ['/', '/welcome', '/setup-account'];
 const adminRoutes = ['/admin']; // This now includes /admin and /admin/*
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const session = await getSession();
+
+  // Allow access to setup-account page regardless of session state
+  if (path.startsWith('/setup-account')) {
+    return NextResponse.next();
+  }
 
   const isProtectedRoute = protectedRoutes.some((p) => path.startsWith(p));
   const isAdminRoute = adminRoutes.some((p) => path.startsWith(p));

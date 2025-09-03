@@ -58,6 +58,9 @@ export interface UserSession extends SessionPayload {
     name: string;
     email: string;
     avatarUrl?: string | null;
+    defaultVoice?: string | null;
+    defaultSpeakingRate?: number | null;
+    defaultZoomLevel?: number | null;
 }
 
 // Helper function to get the correct key prefix
@@ -74,6 +77,9 @@ export async function getUserSession(): Promise<UserSession | null> {
             name: user.name,
             email: user.email,
             avatarUrl: user.avatarUrl,
+            defaultVoice: user.defaultVoice,
+            defaultSpeakingRate: user.defaultSpeakingRate,
+            defaultZoomLevel: user.defaultZoomLevel,
         };
     }
   }

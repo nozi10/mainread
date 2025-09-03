@@ -14,7 +14,7 @@ import { chatWithPdf, ChatWithPdfOutput } from '@/ai/flows/chat-with-pdf';
 import { generateGlossary, GenerateGlossaryOutput, GlossaryItem } from '@/ai/flows/glossary-flow';
 import { generateQuiz, type GenerateQuizOutput } from '@/ai/flows/quiz-flow';
 import { Sidebar, SidebarHeader, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarContent } from '@/components/ui/sidebar';
-import { getDocuments, saveDocument, Document, getUserSession, ChatMessage, deleteDocument, clearChatHistory } from '@/lib/db';
+import { getDocuments, saveDocument, Document, getUserSession, ChatMessage, deleteDocument, clearChatHistory, UserSession } from '@/lib/db';
 import AiDialog, { AiDialogType } from '@/components/ai-dialog';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -86,7 +86,7 @@ export default function ReadPage() {
   const [aiQuizOutput, setAiQuizOutput] = useState<GenerateQuizOutput | null>(null);
   const [aiGlossaryOutput, setAiGlossaryOutput] = useState<GenerateGlossaryOutput | null>(null);
 
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<UserSession | null>(null);
 
   const [generationState, setGenerationState] = useState<GenerationState>('idle');
 
@@ -108,19 +108,21 @@ export default function ReadPage() {
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const fetchSession = useCallback(async () => {
+    const sessionData = await getUserSession();
+    setSession(sessionData);
+    if (sessionData) {
+      setSelectedVoice(sessionData.defaultVoice || 'openai/alloy');
+      setSpeakingRate(sessionData.defaultSpeakingRate || 1);
+      setPlaybackRate(sessionData.defaultSpeakingRate || 1);
+      setPdfZoomLevel(activeDoc?.zoomLevel || sessionData.defaultZoomLevel || 1);
+    }
+  }, [activeDoc]);
+
 
   useEffect(() => {
-    async function checkSession() {
-      const sessionData = await getUserSession();
-      setSession(sessionData);
-      if (sessionData) {
-        setSelectedVoice(sessionData.defaultVoice || 'openai/alloy');
-        setSpeakingRate(sessionData.defaultSpeakingRate || 1);
-        setPlaybackRate(sessionData.defaultSpeakingRate || 1);
-      }
-    }
-    checkSession();
-  }, []);
+    fetchSession();
+  }, [fetchSession]);
 
   const fetchUserDocuments = useCallback(async () => {
     try {
@@ -869,7 +871,7 @@ export default function ReadPage() {
             </div>
             </SidebarContent>
             <SidebarFooter>
-                {session && <UserPanel session={session} onLogout={handleLogout} />}
+                {session && <UserPanel session={session} onLogout={handleLogout} onUpdate={fetchSession} />}
             </SidebarFooter>
         </Sidebar>
         

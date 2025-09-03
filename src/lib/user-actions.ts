@@ -45,12 +45,21 @@ export async function updateUserProfile(formData: FormData): Promise<{ success: 
         if (user.avatarUrl) {
             await deleteBlob(user.avatarUrl);
         }
-        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/upload`, {
+        // Use VERCEL_URL in production, otherwise fall back to the public app url.
+        const appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXT_PUBLIC_APP_URL;
+        if (!appUrl) {
+            throw new Error("Application URL is not configured. Please set NEXT_PUBLIC_APP_URL environment variable.");
+        }
+        const uploadResponse = await fetch(`${appUrl}/api/upload`, {
             method: 'POST',
             headers: { 'x-vercel-filename': avatarFile.name },
             body: avatarFile,
         });
-        if (!uploadResponse.ok) throw new Error('Failed to upload new avatar.');
+        if (!uploadResponse.ok) {
+            const errorBody = await uploadResponse.text();
+            console.error("Upload API Error:", errorBody);
+            throw new Error('Failed to upload new avatar.');
+        }
         const blob = await uploadResponse.json();
         avatarUrl = blob.url;
     }
@@ -72,8 +81,7 @@ export async function updateUserProfile(formData: FormData): Promise<{ success: 
     }
     await pipeline.exec();
     
-    revalidatePath('/profile');
-    revalidatePath('/read');
+    revalidatePath('/read'); // Revalidate to update the user panel
 
     return { success: true };
   } catch (error) {
@@ -169,6 +177,10 @@ export async function deleteUserAccount(password: string): Promise<{ success: bo
                 await kv.del(...docKeys);
             }
         }
+        
+        if (user.avatarUrl) {
+            await deleteBlob(user.avatarUrl);
+        }
 
         const pipeline = kv.pipeline();
         pipeline.del(docListKey);
@@ -183,7 +195,7 @@ export async function deleteUserAccount(password: string): Promise<{ success: bo
 
         return { success: true };
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
         console.error('Failed to delete user account:', message);
         return { success: false, message };
     }

@@ -6,20 +6,20 @@ import { useForm, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { changeUserPassword, updateUserProfile, deleteUserAccount } from '@/lib/user-actions';
-import { Loader2, ArrowLeft, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getDocuments, getUserSession, type Document, type UserSession } from '@/lib/db';
+import { getUserSession, type Document, type UserSession } from '@/lib/db';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getAvailableVoices, AvailableVoice } from '@/ai/flows/voice-selection';
 import { Slider } from '@/components/ui/slider';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 const passwordFormSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required.'),
@@ -35,11 +35,15 @@ const profileFormSchema = z.object({
 });
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
-export default function ProfilePage() {
+type ProfileDialogProps = {
+  session: UserSession;
+  onOpenChange: (open: boolean) => void;
+  onUpdate: () => void; // To refresh session data on parent
+};
+
+export default function ProfileDialog({ session, onOpenChange, onUpdate }: ProfileDialogProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
-  const [recentDocs, setRecentDocs] = useState<Document[]>([]);
   const [availableVoices, setAvailableVoices] = useState<AvailableVoice[]>([]);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
@@ -51,24 +55,20 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function fetchData() {
-      const userSession = await getUserSession();
-      setSession(userSession);
-      const docs = await getDocuments();
-      setRecentDocs(docs.slice(0, 5));
       const voices = await getAvailableVoices();
       setAvailableVoices(voices);
 
-      if (userSession) {
+      if (session) {
         profileForm.reset({
-            name: userSession.name || '',
-            defaultVoice: userSession.defaultVoice || 'openai/alloy',
-            defaultSpeakingRate: userSession.defaultSpeakingRate || 1.0,
-            defaultZoomLevel: userSession.defaultZoomLevel || 1.0,
+            name: session.name || '',
+            defaultVoice: session.defaultVoice || 'openai/alloy',
+            defaultSpeakingRate: session.defaultSpeakingRate || 1.0,
+            defaultZoomLevel: session.defaultZoomLevel || 1.0,
         });
       }
     }
     fetchData();
-  }, []);
+  }, [session]);
 
   const passwordForm = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordFormSchema),
@@ -78,10 +78,10 @@ export default function ProfilePage() {
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      name: '',
-      defaultVoice: 'openai/alloy',
-      defaultSpeakingRate: 1.0,
-      defaultZoomLevel: 1.0,
+      name: session.name || '',
+      defaultVoice: session.defaultVoice || 'openai/alloy',
+      defaultSpeakingRate: session.defaultSpeakingRate || 1.0,
+      defaultZoomLevel: session.defaultZoomLevel || 1.0,
     }
   });
 
@@ -126,7 +126,8 @@ export default function ProfilePage() {
       const result = await updateUserProfile(formData);
       if (result.success) {
         toast({ title: 'Success', description: 'Your profile has been updated.' });
-        profileForm.reset(values); // Reset to new values to clear dirty state
+        profileForm.reset(values);
+        onUpdate(); // Trigger refresh
       } else {
         throw new Error(result.message || 'Failed to update profile.');
       }
@@ -164,6 +165,7 @@ export default function ProfilePage() {
     } finally {
         setIsDeleteLoading(false);
         setIsDeleteDialogOpen(false);
+        onOpenChange(false);
     }
   }
 
@@ -176,30 +178,22 @@ export default function ProfilePage() {
     }, {} as Record<string, AvailableVoice[]>);
   }, [availableVoices]);
 
-  if (!session) {
-    return (
-        <main className="flex items-center justify-center min-h-screen">
-            <Loader2 className="h-8 w-8 animate-spin" />
-        </main>
-    )
-  }
+  if (!session) return null;
 
   return (
-    <main className="flex flex-col items-center min-h-screen bg-background p-4 sm:p-6 md:p-8">
-      <div className="w-full max-w-4xl">
-        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to App
-        </Button>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>Update your personal details here.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...profileForm}>
+    <DialogContent className="max-w-2xl">
+      <DialogHeader>
+        <DialogTitle>My Account</DialogTitle>
+        <DialogDescription>Manage your profile, preferences, and security settings.</DialogDescription>
+      </DialogHeader>
+      <Tabs defaultValue="profile">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="danger">Danger Zone</TabsTrigger>
+        </TabsList>
+        <TabsContent value="profile" className="py-4">
+            <Form {...profileForm}>
                 <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
                     <div className="flex items-center gap-6">
                         <Avatar className="h-20 w-20">
@@ -230,7 +224,7 @@ export default function ProfilePage() {
                         <FormDescription>Upload a new avatar. Max 2MB.</FormDescription>
                     </FormItem>
                     
-                    <CardTitle className="pt-4 border-t">Reading Preferences</CardTitle>
+                    <h3 className="pt-4 border-t text-lg font-medium">Reading Preferences</h3>
                     
                     <FormField
                         control={profileForm.control}
@@ -238,7 +232,7 @@ export default function ProfilePage() {
                         render={({ field }) => (
                         <FormItem>
                             <FormLabel>Default Voice</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
                                 <SelectContent>
                                     {Object.entries(groupedVoices).map(([provider, voices]) => (
@@ -280,25 +274,17 @@ export default function ProfilePage() {
                         </FormItem>
                         )}
                     />
-
-                    <CardFooter className="px-0 pt-6">
+                    <DialogFooter>
                         <Button type="submit" disabled={isProfileLoading || !isProfileDirty}>
                             {isProfileLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Save Changes
                         </Button>
-                    </CardFooter>
+                    </DialogFooter>
                 </form>
-                </Form>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-                <CardDescription>Enter your current password and a new password.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...passwordForm}>
+            </Form>
+        </TabsContent>
+        <TabsContent value="security" className="py-4">
+             <Form {...passwordForm}>
                 <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
                     <FormField control={passwordForm.control} name="currentPassword" render={({ field }) => (
                         <FormItem><FormLabel>Current Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
@@ -306,79 +292,53 @@ export default function ProfilePage() {
                     <FormField control={passwordForm.control} name="newPassword" render={({ field }) => (
                         <FormItem><FormLabel>New Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
-                    <CardFooter className="px-0 pt-6">
+                    <DialogFooter>
                       <Button type="submit" disabled={isPasswordLoading}>
                           {isPasswordLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Update Password
                       </Button>
-                    </CardFooter>
+                    </DialogFooter>
                 </form>
-                </Form>
-              </CardContent>
-            </Card>
-
-            <Card className="border-destructive">
-                 <CardHeader>
-                    <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                    <CardDescription>These actions are permanent and cannot be undone.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="destructive"><Trash2 className="mr-2"/>Delete My Account</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Are you absolutely sure?</DialogTitle>
-                                <DialogDescription>
-                                    This action cannot be undone. This will permanently delete your account, documents, and all associated data. To confirm, please type your email address (`{session.email}`) below.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                 <Input 
-                                    placeholder="Enter your email to confirm"
-                                    value={deleteConfirmation}
-                                    onChange={(e) => setDeleteConfirmation(e.target.value)}
-                                />
-                                <div className="space-y-2 relative">
-                                    <Label htmlFor="delete-password">Enter Your Current Password</Label>
-                                    <Input {...passwordForm.register("currentPassword")} id="delete-password" type={showPassword ? 'text' : 'password'} required />
-                                    <Button type="button" variant="ghost" size="icon" className="absolute bottom-1 right-1 h-7 w-7" onClick={() => setShowPassword(!showPassword)}>
-                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </Button>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-                                <Button variant="destructive" onClick={handleDeleteAccount} disabled={isDeleteLoading || deleteConfirmation !== session.email}>
-                                    {isDeleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                    I understand, delete my account
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </CardContent>
-            </Card>
-          </div>
-
-          <div className="md:col-span-1 space-y-8">
-            <Card>
-                <CardHeader><CardTitle>Recent Activity</CardTitle></CardHeader>
-                <CardContent>
-                    <ul className="space-y-3">
-                        {recentDocs.length > 0 ? recentDocs.map(doc => (
-                            <li key={doc.id} className="text-sm text-muted-foreground truncate">
-                                <span className="font-medium text-foreground">Accessed:</span> {doc.fileName}
-                            </li>
-                        )) : (
-                            <p className="text-sm text-muted-foreground">No recent documents.</p>
-                        )}
-                    </ul>
-                </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    </main>
+            </Form>
+        </TabsContent>
+        <TabsContent value="danger" className="py-4">
+            <p className="text-sm text-destructive mb-4">This action is permanent and cannot be undone.</p>
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="destructive"><Trash2 className="mr-2"/>Delete My Account</Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Are you absolutely sure?</DialogTitle>
+                        <DialogDescription>
+                            This will permanently delete your account and all associated data. To confirm, please type your email address (`{session.email}`) and current password below.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                         <Input 
+                            placeholder="Enter your email to confirm"
+                            value={deleteConfirmation}
+                            onChange={(e) => setDeleteConfirmation(e.target.value)}
+                        />
+                        <div className="space-y-2 relative">
+                            <Label htmlFor="delete-password">Enter Your Current Password</Label>
+                            <Input {...passwordForm.register("currentPassword")} id="delete-password" type={showPassword ? 'text' : 'password'} required />
+                            <Button type="button" variant="ghost" size="icon" className="absolute bottom-1 right-1 h-7 w-7" onClick={() => setShowPassword(!showPassword)}>
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleDeleteAccount} disabled={isDeleteLoading || deleteConfirmation !== session.email}>
+                            {isDeleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                            I understand, delete my account
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </TabsContent>
+      </Tabs>
+    </DialogContent>
   );
 }
