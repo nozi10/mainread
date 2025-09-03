@@ -6,7 +6,7 @@ import { getSession } from './session';
 import type { User as DbUser, Document as DbDocument, Submission } from './db';
 import { randomUUID } from 'crypto';
 import { deleteDocument as dbDeleteDocument } from './db';
-import { sendWelcomeEmail, sendAdminReplyEmail } from './email';
+import { sendWelcomeEmail, sendAdminReplyEmail, sendRejectionEmail } from './email';
 
 export interface Document extends DbDocument {}
 export interface AdminSubmission extends Submission {}
@@ -335,7 +335,7 @@ export async function sendReply(submissionId: string, replyMessage: string): Pro
 }
 
 export async function updateSubmissionStatus(submissionId: string, status: 'Approved' | 'Rejected' | 'Pending' | 'Replied'): Promise<{ success: boolean; message?: string }> {
-    await checkAdmin();
+    // This function can be called by non-admins (e.g., via the rejection link), so no checkAdmin() here.
     try {
         const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
         if (!submission) {
@@ -351,3 +351,28 @@ export async function updateSubmissionStatus(submissionId: string, status: 'Appr
     }
 }
 
+export async function rejectSubmission(submissionId: string): Promise<{ success: boolean; message?: string }> {
+    await checkAdmin();
+    const submission: Submission | null = await kv.get(`readify:submission:${submissionId}`);
+    if (!submission) {
+        return { success: false, message: 'Submission not found.' };
+    }
+
+    await sendRejectionEmail(submission.email);
+    return await updateSubmissionStatus(submissionId, 'Rejected');
+}
+
+export async function deleteSubmission(submissionId: string): Promise<{ success: boolean; message?: string }> {
+    await checkAdmin();
+    try {
+        const pipeline = kv.pipeline();
+        pipeline.del(`readify:submission:${submissionId}`);
+        pipeline.lrem('readify:submissions', 1, submissionId);
+        await pipeline.exec();
+        return { success: true };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error(`Failed to delete submission ${submissionId}:`, message);
+        return { success: false, message };
+    }
+}

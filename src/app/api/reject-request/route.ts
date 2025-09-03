@@ -34,6 +34,14 @@ export async function GET(request: NextRequest) {
           headers: { 'Content-Type': 'text/html' },
         });
     }
+    
+    if (submission.status !== 'Pending') {
+         return new NextResponse(`<h1>Request Already Actioned</h1><p>This access request has already been ${submission.status.toLowerCase()}. No further action is needed.</p>`, {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        });
+    }
+
 
     // Send the rejection email
     await sendRejectionEmail(submission.email);

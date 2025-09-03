@@ -2,21 +2,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getSubmissions, sendReply, AdminSubmission } from '@/lib/admin-actions';
+import { getSubmissions, sendReply, AdminSubmission, deleteSubmission, rejectSubmission } from '@/lib/admin-actions';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Inbox, Send, Eye } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Loader2, Inbox, Send, Eye, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Label } from './ui/label';
 
 export default function AdminInbox() {
+  const router = useRouter();
   const [submissions, setSubmissions] = useState<AdminSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<AdminSubmission | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isReplyOpen, setIsReplyOpen] = useState(false);
@@ -43,6 +45,45 @@ export default function AdminInbox() {
   useEffect(() => {
     fetchSubmissions();
   }, []);
+
+  const handleAction = async (action: () => Promise<any>, submissionId: string, successMessage: string) => {
+    setIsActionLoading(submissionId);
+    try {
+        const result = await action();
+        if (result.success) {
+            toast({ title: 'Success', description: successMessage });
+            fetchSubmissions();
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        });
+    } finally {
+        setIsActionLoading(null);
+    }
+  }
+
+  const handleApprove = (submission: AdminSubmission) => {
+    // Redirect to admin page with query params to open the Add User dialog
+    const approveUrl = `/admin?action=addUser&name=${encodeURIComponent(submission.name)}&email=${encodeURIComponent(submission.email)}&submissionId=${submission.id}`;
+    router.push(approveUrl);
+  };
+  
+  const handleReject = async (submissionId: string) => {
+    if (confirm('Are you sure you want to reject this access request? An email will be sent to the user.')) {
+        await handleAction(() => rejectSubmission(submissionId), submissionId, 'Access request rejected.');
+    }
+  };
+  
+  const handleDelete = async (submissionId: string) => {
+    if (confirm('Are you sure you want to permanently delete this submission?')) {
+        await handleAction(() => deleteSubmission(submissionId), submissionId, 'Submission deleted.');
+    }
+  };
 
   const handleView = (submission: AdminSubmission) => {
     setSelectedSubmission(submission);
@@ -78,12 +119,12 @@ export default function AdminInbox() {
     }
   };
 
-  const getStatusVariant = (status: AdminSubmission['status']): 'default' | 'secondary' | 'destructive' => {
+  const getStatusVariant = (status: AdminSubmission['status']): 'default' | 'secondary' | 'destructive' | 'outline' => {
       switch(status) {
           case 'Approved': return 'default';
           case 'Pending': return 'secondary';
           case 'Rejected': return 'destructive';
-          case 'Replied': return 'default';
+          case 'Replied': return 'outline';
           default: return 'secondary';
       }
   }
@@ -103,7 +144,7 @@ export default function AdminInbox() {
                 <TableHead>From</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -121,13 +162,35 @@ export default function AdminInbox() {
                   <TableCell>
                     <Badge variant={getStatusVariant(sub.status)}>{sub.status}</Badge>
                   </TableCell>
-                  <TableCell className="space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleView(sub)}>
-                      <Eye className="mr-2 h-4 w-4"/> View
-                    </Button>
-                    <Button size="sm" onClick={() => handleReply(sub)} disabled={sub.status === 'Replied'}>
-                      <Send className="mr-2 h-4 w-4"/> Reply
-                    </Button>
+                  <TableCell className="space-x-1 text-right">
+                    {isActionLoading === sub.id ? <Loader2 className="h-5 w-5 animate-spin inline-flex" /> : (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => handleView(sub)}>
+                          <Eye className="mr-2 h-4 w-4"/> View
+                        </Button>
+                        
+                        {sub.type === 'Access Request' && sub.status === 'Pending' && (
+                            <>
+                                <Button size="sm" onClick={() => handleApprove(sub)} variant="secondary">
+                                    <CheckCircle className="mr-2 h-4 w-4"/> Approve
+                                </Button>
+                                <Button size="sm" onClick={() => handleReject(sub.id)} variant="destructive">
+                                    <XCircle className="mr-2 h-4 w-4"/> Reject
+                                </Button>
+                            </>
+                        )}
+
+                        {sub.type === 'General Inquiry' && sub.status !== 'Replied' && (
+                             <Button size="sm" onClick={() => handleReply(sub)}>
+                                <Send className="mr-2 h-4 w-4"/> Reply
+                            </Button>
+                        )}
+                        
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(sub.id)}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
