@@ -47,11 +47,17 @@ export interface User {
     createdAt: string;
     setupToken: string | null;
     setupTokenExpiry: string | null;
+    // User preferences
+    avatarUrl?: string | null;
+    defaultVoice?: string | null;
+    defaultSpeakingRate?: number | null;
+    defaultZoomLevel?: number | null;
 }
 
 export interface UserSession extends SessionPayload {
     name: string;
     email: string;
+    avatarUrl?: string | null;
 }
 
 // Helper function to get the correct key prefix
@@ -67,6 +73,7 @@ export async function getUserSession(): Promise<UserSession | null> {
             ...session,
             name: user.name,
             email: user.email,
+            avatarUrl: user.avatarUrl,
         };
     }
   }

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { UploadCloud, FileText, Loader2, LogOut, Save, Library, Download, Bot, Lightbulb, HelpCircle, Cloud, CloudOff, Settings, Menu, Home, BarChart, BookOpenCheck, BrainCircuit, Mic, FastForward, Rewind, Wind, Maximize, Minimize, ZoomIn, ZoomOut, Trash2, XCircle, MessageSquare, PlusCircle } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, Save, Library, Download, Bot, Lightbulb, HelpCircle, Cloud, CloudOff, Settings, Menu, Home, BarChart, BookOpenCheck, BrainCircuit, Mic, FastForward, Rewind, Wind, Maximize, Minimize, ZoomIn, ZoomOut, Trash2, XCircle, MessageSquare, PlusCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import AudioPlayer from '@/components/audio-player';
 import { useToast } from "@/hooks/use-toast";
@@ -13,9 +13,8 @@ import { summarizePdf, SummarizePdfOutput } from '@/ai/flows/summarize-pdf';
 import { chatWithPdf, ChatWithPdfOutput } from '@/ai/flows/chat-with-pdf';
 import { generateGlossary, GenerateGlossaryOutput, GlossaryItem } from '@/ai/flows/glossary-flow';
 import { generateQuiz, type GenerateQuizOutput } from '@/ai/flows/quiz-flow';
-import { Sidebar, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarContent } from '@/components/ui/sidebar';
+import { Sidebar, SidebarHeader, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarContent } from '@/components/ui/sidebar';
 import { getDocuments, saveDocument, Document, getUserSession, ChatMessage, deleteDocument, clearChatHistory } from '@/lib/db';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import AiDialog, { AiDialogType } from '@/components/ai-dialog';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -24,9 +23,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Volume2 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ChatWindow } from '@/components/chat-window';
 import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
@@ -35,6 +31,7 @@ import { generateSpeech } from '@/ai/flows/generate-speech';
 import PdfViewer, { Highlight } from '@/components/pdf-viewer';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { SpeechMark } from '@/ai/schemas';
+import UserPanel from '@/components/user-panel';
 
 type GenerationState = 'idle' | 'generating' | 'error';
 type ActiveDocument = Document;
@@ -89,16 +86,9 @@ export default function ReadPage() {
   const [aiQuizOutput, setAiQuizOutput] = useState<GenerateQuizOutput | null>(null);
   const [aiGlossaryOutput, setAiGlossaryOutput] = useState<GenerateGlossaryOutput | null>(null);
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  const [session, setSession] = useState<any>(null);
 
   const [generationState, setGenerationState] = useState<GenerationState>('idle');
-
-  const [synthesisText, setSynthesisText] = useState('');
-  const [synthesisVoice, setSynthesisVoice] = useState('openai/alloy');
-  const [synthesisRate, setSynthesisRate] = useState(1.0);
-  const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [synthesisAudioUrl, setSynthesisAudioUrl] = useState<string | null>(null);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -121,10 +111,12 @@ export default function ReadPage() {
 
   useEffect(() => {
     async function checkSession() {
-      const session = await getUserSession();
-      if (session) {
-        setIsAdmin(session.isAdmin || false);
-        setUserEmail(session.email || 'user@example.com');
+      const sessionData = await getUserSession();
+      setSession(sessionData);
+      if (sessionData) {
+        setSelectedVoice(sessionData.defaultVoice || 'openai/alloy');
+        setSpeakingRate(sessionData.defaultSpeakingRate || 1);
+        setPlaybackRate(sessionData.defaultSpeakingRate || 1);
       }
     }
     checkSession();
@@ -391,38 +383,6 @@ export default function ReadPage() {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       toast({ variant: "destructive", title: "Audio Error", description: `Could not play response: ${errorMessage}` });
     }
-  };
-
-  const handleSynthesize = async () => {
-      if (!synthesisText.trim()) {
-          toast({ variant: "destructive", title: "No Text", description: "Please enter some text to synthesize." });
-          return;
-      }
-      setIsSynthesizing(true);
-      setSynthesisAudioUrl(null);
-      if (localAudioUrlRef.current) {
-          URL.revokeObjectURL(localAudioUrlRef.current);
-          localAudioUrlRef.current = null;
-      }
-      try {
-        const result = await generateSpeech({
-            text: synthesisText,
-            voice: synthesisVoice, // Use local voice for this tab
-            speakingRate: synthesisRate, // Use local rate for this tab
-        });
-          
-        if (result.audioDataUris && result.audioDataUris.length > 0) {
-            const mergedAudioBlob = await mergeAudio(result.audioDataUris);
-            const audioUrl = URL.createObjectURL(mergedAudioBlob);
-            localAudioUrlRef.current = audioUrl;
-            setSynthesisAudioUrl(audioUrl);
-        }
-      } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-          toast({ variant: "destructive", title: "Synthesis Error", description: `Could not generate audio: ${errorMessage}` });
-      } finally {
-          setIsSynthesizing(false);
-      }
   };
 
   useEffect(() => {
@@ -909,32 +869,7 @@ export default function ReadPage() {
             </div>
             </SidebarContent>
             <SidebarFooter>
-            {isAdmin && (
-                <>
-                    <Separator />
-                    <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton onClick={() => router.push('/admin')}>
-                            <Settings />
-                            Admin Dashboard
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    </SidebarMenu>
-                </>
-                )}
-            <div className="flex items-center gap-3 p-2">
-                <Avatar>
-                <AvatarImage data-ai-hint="user avatar" src="https://placehold.co/40x40.png" />
-                <AvatarFallback>{userEmail.charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-medium truncate" onClick={() => router.push('/profile')} style={{cursor: 'pointer'}}>{userEmail}</p>
-                </div>
-                <Button onClick={handleLogout} variant="ghost" size="icon">
-                    <LogOut className="h-5 w-5"/>
-                    <span className="sr-only">Log out</span>
-                </Button>
-            </div>
+                {session && <UserPanel session={session} onLogout={handleLogout} />}
             </SidebarFooter>
         </Sidebar>
         
