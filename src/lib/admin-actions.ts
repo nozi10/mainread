@@ -168,7 +168,8 @@ export async function createUser(userData: {
         pipeline.set(`readify:user:id:${userId}`, newUser);
         await pipeline.exec();
         
-        const setupLink = `${process.env.NEXT_PUBLIC_APP_URL}/setup-account/${setupToken}`;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const setupLink = `${appUrl}/setup-account/${setupToken}`;
         await sendWelcomeEmail(email, name, setupLink);
 
         return { success: true };
@@ -273,7 +274,8 @@ export async function resendInvitation(userId: string): Promise<{success: boolea
         pipeline.set(`readify:user:email:${user.email}`, updatedUser);
         await pipeline.exec();
 
-        const setupLink = `${process.env.NEXT_PUBLIC_APP_URL}/setup-account/${setupToken}`;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const setupLink = `${appUrl}/setup-account/${setupToken}`;
         await sendWelcomeEmail(user.email, user.name, setupLink);
 
         return { success: true };
