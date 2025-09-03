@@ -13,7 +13,6 @@ type UserPanelProps = {
     userEmail: string;
     onLogout: () => void;
     onNavigateToAdmin: () => void;
-    onNavigateToProfile: () => void;
 };
 
 const UserPanel: React.FC<UserPanelProps> = ({
@@ -21,7 +20,6 @@ const UserPanel: React.FC<UserPanelProps> = ({
     userEmail,
     onLogout,
     onNavigateToAdmin,
-    onNavigateToProfile
 }) => {
     return (
         <>
@@ -44,7 +42,7 @@ const UserPanel: React.FC<UserPanelProps> = ({
                 <AvatarFallback>{userEmail.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-medium truncate" onClick={onNavigateToProfile} style={{cursor: 'pointer'}}>{userEmail}</p>
+                <p className="text-sm font-medium truncate">{userEmail}</p>
                 </div>
                 <Button onClick={onLogout} variant="ghost" size="icon">
                     <LogOut className="h-5 w-5"/>
@@ -56,3 +54,5 @@ const UserPanel: React.FC<UserPanelProps> = ({
 };
 
 export default UserPanel;
+
+    

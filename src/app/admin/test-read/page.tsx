@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { UploadCloud, BarChart, TestTube2 } from 'lucide-react';
 import { useDocumentManager } from '@/hooks/test-page/useDocumentManager';
@@ -26,7 +26,6 @@ import SpeechSynthesizer from '@/components/test-layout/SpeechSynthesizer';
 import { generateSpeech } from '@/ai/flows/generate-speech';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { SpeechMark } from '@/ai/schemas';
 
 // Helper function to concatenate audio blobs
 async function mergeAudio(audioDataUris: string[]): Promise<Blob> {
@@ -58,7 +57,6 @@ export default function TestReadPage() {
 
   const {
     activeDoc,
-    setActiveDoc,
     documentText,
     userDocuments,
     pdfZoomLevel,
@@ -438,7 +436,6 @@ export default function TestReadPage() {
                     userEmail={userEmail}
                     onLogout={handleLogout}
                     onNavigateToAdmin={() => router.push('/admin')}
-                    onNavigateToProfile={() => router.push('/profile')}
                 />
             </SidebarFooter>
         </Sidebar>
@@ -524,3 +521,5 @@ export default function TestReadPage() {
     </TooltipProvider>
   );
 }
+
+    

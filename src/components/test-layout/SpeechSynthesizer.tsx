@@ -124,3 +124,5 @@ const SpeechSynthesizer: React.FC<SpeechSynthesizerProps> = ({
 }
 
 export default SpeechSynthesizer;
+
+    

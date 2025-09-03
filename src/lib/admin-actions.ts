@@ -95,7 +95,7 @@ export async function deleteUser(userId: string): Promise<{ success: boolean; me
   await checkAdmin();
   
   try {
-    const user: User | null = await kv.get(`readify:user:id:${userId}`);
+    const user: User | null = await kv.get(`readify:user:id:${userId}`);
     if (!user) {
       throw new Error('User not found');
     }
@@ -110,20 +110,18 @@ export async function deleteUser(userId: string): Promise<{ success: boolean; me
     const prodDocListKey = `readify:user:${userId}:docs`;
     const stagingDocListKey = `readify:staging:user:${userId}:docs`;
     const [prodDocIds, stagingDocIds] = await Promise.all([
-        kv.lrange<string[]>(prodDocListKey, 0, -1),
-        kv.lrange<string[]>(stagingDocListKey, 0, -1),
+        kv.lrange(prodDocListKey, 0, -1),
+        kv.lrange(stagingDocListKey, 0, -1),
     ]);
 
-    const allDocIds = [...prodDocIds, ...stagingDocIds];
+    const allDocIds = [...(prodDocIds || []), ...(stagingDocIds || [])];
     
     if (allDocIds.length > 0) {
       const validDocIds = allDocIds.filter(id => id);
       if (validDocIds.length > 0) {
-        const prodDocKeysToDelete = prodDocIds.map(id => `readify:doc:${id}`);
-        const stagingDocKeysToDelete = stagingDocIds.map(id => `readify:staging:doc:${id}`);
-        // @ts-ignore
+        const prodDocKeysToDelete = (prodDocIds || []).filter(id => id).map(id => `readify:doc:${id}`);
+        const stagingDocKeysToDelete = (stagingDocIds || []).filter(id => id).map(id => `readify:staging:doc:${id}`);
         if (prodDocKeysToDelete.length > 0) pipeline.del(...prodDocKeysToDelete);
-        // @ts-ignore
         if (stagingDocKeysToDelete.length > 0) pipeline.del(...stagingDocKeysToDelete);
       }
     }
@@ -300,7 +298,7 @@ export async function resendInvitation(userId: string): Promise<{success: boolea
 
         return { success: true };
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+        const message = error instanceof Error ? error.message : 'An unknown error occurred';
         console.error('Failed to resend invitation:', message);
         return { success: false, message };
     }

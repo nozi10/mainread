@@ -24,7 +24,7 @@ export interface QuizAttempt {
 }
 
 export interface Document {
-  id: string | null; 
+  id: string; 
   userId: string;
   fileName: string;
   pdfUrl: string;
@@ -88,8 +88,8 @@ export async function getUserSession(): Promise<UserSession | null> {
 
 export async function saveDocument(docData: Partial<Document>, isStaging: boolean = false): Promise<Document> {
   const session = await getSession();
-  if (!session?.userId || !session.username) {
-    throw new Error('Authentication and username required.');
+  if (!session?.userId) {
+    throw new Error('Authentication required.');
   }
   const userId = session.userId;
   const prefix = getKeyPrefix(isStaging);
