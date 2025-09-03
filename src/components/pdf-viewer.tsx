@@ -38,6 +38,10 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   };
 
   const onDocumentLoadError = (error: Error) => {
+    // Ignore AbortException which is a non-critical warning
+    if (error.name === 'AbortException') {
+        return;
+    }
     console.error("PDF Load Error:", error);
     toast({
       variant: 'destructive',
@@ -113,4 +117,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   );
 };
 
-export default PdfViewer;
+export default React.memo(PdfViewer, (prevProps, nextProps) => {
+    // Custom comparison function
+    return (
+        prevProps.file === nextProps.file &&
+        prevProps.zoomLevel === nextProps.zoomLevel &&
+        prevProps.documentText === nextProps.documentText &&
+        prevProps.highlight?.start === nextProps.highlight?.start &&
+        prevProps.highlight?.end === nextProps.highlight?.end
+    );
+});

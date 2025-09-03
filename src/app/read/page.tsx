@@ -341,12 +341,16 @@ export default function ReadPage() {
         const currentWord = speechMarks.find(mark => mark.type === 'word' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 10)); // Heuristic for word duration
         const currentSentence = speechMarks.find(mark => mark.type === 'sentence' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 20));
         
+        let newHighlight: Highlight | null = null;
         if (currentWord) {
-            setCurrentHighlight({ type: 'word', start: currentWord.start, end: currentWord.end });
+            newHighlight = { type: 'word', start: currentWord.start, end: currentWord.end };
         } else if (currentSentence) {
-            setCurrentHighlight({ type: 'sentence', start: currentSentence.start, end: currentSentence.end });
-        } else {
-            setCurrentHighlight(null);
+            newHighlight = { type: 'sentence', start: currentSentence.start, end: currentSentence.end };
+        }
+        
+        // Only update state if the highlight has changed to prevent rapid re-renders
+        if (newHighlight?.start !== currentHighlight?.start || newHighlight?.end !== currentHighlight?.end) {
+            setCurrentHighlight(newHighlight);
         }
       }
   }
