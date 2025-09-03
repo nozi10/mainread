@@ -4,6 +4,7 @@
 import { Resend } from 'resend';
 import { WelcomeEmail } from '@/components/emails/welcome-email';
 import { ContactFormEmail } from '@/components/emails/contact-form-email';
+import { RejectionEmail } from '@/components/emails/rejection-email';
 
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -40,14 +41,14 @@ export async function sendWelcomeEmail(
   }
 }
 
-export async function sendContactFormEmail({ name, email, message }: { name: string, email: string, message: string }) {
+export async function sendContactFormEmail({ name, email, message, approveUrl, rejectUrl }: { name: string, email: string, message: string, approveUrl: string, rejectUrl: string }) {
     try {
         const { data, error } = await resend.emails.send({
             from: `Readify Contact Form <${fromEmail}>`,
             to: toEmail,
             subject: `New Readify Inquiry from ${name}`,
             reply_to: email,
-            react: ContactFormEmail({ name, email, message }),
+            react: ContactFormEmail({ name, email, message, approveUrl, rejectUrl }),
         });
 
         if (error) {
@@ -64,3 +65,25 @@ export async function sendContactFormEmail({ name, email, message }: { name: str
         throw new Error(`Failed to send contact email: ${message}`);
     }
 }
+
+export async function sendRejectionEmail(to: string) {
+    try {
+      const { data, error } = await resend.emails.send({
+        from: `Readify <${fromEmail}>`,
+        to,
+        subject: 'Update on Your Readify Access Request',
+        react: RejectionEmail(),
+      });
+  
+      if (error) {
+        throw new Error(`Resend failed: ${error.message}`);
+      }
+  
+      console.log('Rejection email sent successfully:', data?.id);
+      return data;
+    } catch (error) {
+      console.error('Error in sendRejectionEmail:', error);
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
+      throw new Error(`Failed to send rejection email: ${message}`);
+    }
+  }

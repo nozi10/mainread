@@ -8,6 +8,7 @@ import type { User } from './db';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { sendContactFormEmail } from './email';
+import { randomUUID } from 'crypto';
 
 const SetupAccountSchema = z.object({
   username: z.string()
@@ -179,9 +180,19 @@ export async function sendContactMessage(formData: { name: string; email: string
   }
 
   const { name, email, message } = validation.data;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   
   try {
-    await sendContactFormEmail({ name, email, message });
+    // Generate a secure token for the rejection link
+    const rejectionToken = randomUUID();
+    // Store the token with the user's email, with a 7-day expiry
+    await kv.set(`readify:rejection-token:${rejectionToken}`, email, { ex: 7 * 24 * 60 * 60 });
+    
+    const approveUrl = `${appUrl}/admin?action=addUser&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+    const rejectUrl = `${appUrl}/api/reject-request?token=${rejectionToken}&email=${encodeURIComponent(email)}`;
+
+    await sendContactFormEmail({ name, email, message, approveUrl, rejectUrl });
+
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';

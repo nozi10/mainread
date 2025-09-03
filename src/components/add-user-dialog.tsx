@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -41,9 +41,10 @@ type AddUserDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   onUserAdded: () => void;
+  prefilledData?: { name: string; email: string } | null;
 };
 
-export default function AddUserDialog({ isOpen, onClose, onUserAdded }: AddUserDialogProps) {
+export default function AddUserDialog({ isOpen, onClose, onUserAdded, prefilledData }: AddUserDialogProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const form = useForm<AddUserFormValues>({
@@ -54,6 +55,23 @@ export default function AddUserDialog({ isOpen, onClose, onUserAdded }: AddUserD
       role: 'User',
     },
   });
+
+  useEffect(() => {
+    if (prefilledData) {
+      form.reset({
+        name: prefilledData.name,
+        email: prefilledData.email,
+        role: 'User',
+      });
+    } else {
+      form.reset({
+        name: '',
+        email: '',
+        role: 'User'
+      });
+    }
+  }, [prefilledData, form, isOpen]);
+
 
   const onSubmit = async (values: AddUserFormValues) => {
     setIsLoading(true);

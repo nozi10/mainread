@@ -8,6 +8,8 @@ import {
   Preview,
   Text,
   Hr,
+  Button,
+  Section,
 } from '@react-email/components';
 import * as React from 'react';
 
@@ -15,17 +17,19 @@ interface ContactFormEmailProps {
   name: string;
   email: string;
   message: string;
+  approveUrl: string;
+  rejectUrl: string;
 }
 
-export const ContactFormEmail = ({ name, email, message }: ContactFormEmailProps) => (
+export const ContactFormEmail = ({ name, email, message, approveUrl, rejectUrl }: ContactFormEmailProps) => (
   <Html>
     <Head />
-    <Preview>New Contact Form Submission from {name}</Preview>
+    <Preview>New Access Request from {name}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>New Inquiry from your Website</Heading>
+        <Heading style={h1}>New Access Request for Readify</Heading>
         <Text style={text}>
-          You have received a new message through the contact form on your Readify website.
+          You have received a new request for access from the Readify website.
         </Text>
         <Hr style={hr} />
         <Text style={text}>
@@ -35,10 +39,23 @@ export const ContactFormEmail = ({ name, email, message }: ContactFormEmailProps
           <strong>Email:</strong> <a href={`mailto:${email}`} style={link}>{email}</a>
         </Text>
         <Hr style={hr} />
-        <Heading as="h2" style={h2}>Message:</Heading>
-        <Text style={{ ...text, whiteSpace: 'pre-wrap' }}>
+        <Heading as="h2" style={h2}>Reason for Request:</Heading>
+        <Text style={{ ...text, whiteSpace: 'pre-wrap', border: '1px solid #eee', padding: '10px' }}>
           {message}
         </Text>
+
+        <Section style={{ textAlign: 'center', marginTop: '30px' }}>
+           <Text style={text}>
+             Quick Actions:
+           </Text>
+           <Button style={buttonPrimary} href={approveUrl}>
+             Approve & Add User
+           </Button>
+           <Button style={buttonSecondary} href={rejectUrl}>
+             Reject Request
+           </Button>
+        </Section>
+
       </Container>
     </Body>
   </Html>
@@ -89,4 +106,27 @@ const hr = {
 const link = {
     color: '#3F51B5',
     textDecoration: 'underline',
+}
+
+const button = {
+    borderRadius: '5px',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    textDecoration: 'none',
+    textAlign: 'center' as const,
+    display: 'inline-block',
+    padding: '12px 20px',
+    margin: '0 5px'
+}
+
+const buttonPrimary = {
+    ...button,
+    backgroundColor: '#3F51B5',
+    color: '#fff',
+}
+
+const buttonSecondary = {
+    ...button,
+    backgroundColor: '#E8EAF6',
+    color: '#3F51B5',
 }

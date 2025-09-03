@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,12 +17,14 @@ import { TooltipProvider, Tooltip as UiTooltip, TooltipContent, TooltipTrigger }
 
 export default function AdminPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserType[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [prefilledUserData, setPrefilledUserData] = useState<{name: string, email: string} | null>(null);
 
   const fetchAdminData = async () => {
     setIsLoading(true);
@@ -48,7 +50,20 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchAdminData();
-  }, []);
+
+    const action = searchParams.get('action');
+    if (action === 'addUser') {
+        const name = searchParams.get('name');
+        const email = searchParams.get('email');
+        if (name && email) {
+            setPrefilledUserData({ name, email });
+            setIsAddUserOpen(true);
+            // Clean up URL
+            router.replace('/admin', { scroll: false });
+        }
+    }
+
+  }, [searchParams, router]);
 
   const handleDeleteUser = async (userId: string) => {
     if (confirm('Are you sure you want to delete this user and all their documents? This action cannot be undone.')) {
@@ -130,6 +145,11 @@ export default function AdminPage() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/');
   };
+
+  const handleAddUserClick = () => {
+    setPrefilledUserData(null);
+    setIsAddUserOpen(true);
+  }
   
 
   return (
@@ -242,7 +262,7 @@ export default function AdminPage() {
                     <Users />
                     <CardTitle>User Management</CardTitle>
                 </div>
-                <Button onClick={() => setIsAddUserOpen(true)}><PlusCircle className="mr-2"/>Add User</Button>
+                <Button onClick={handleAddUserClick}><PlusCircle className="mr-2"/>Add User</Button>
                 </CardHeader>
                 <CardContent>
                 <Table>
@@ -346,6 +366,7 @@ export default function AdminPage() {
         fetchAdminData();
         setIsAddUserOpen(false);
       }}
+      prefilledData={prefilledUserData}
     />
     </TooltipProvider>
   );
