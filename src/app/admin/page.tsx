@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, MailRepeat, LogIn } from 'lucide-react';
+import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -264,7 +264,7 @@ export default function AdminPage() {
                         <TableCell className='space-x-1'>
                              {!user.username && (
                                 <Button variant="outline" size="icon" onClick={() => handleResendInvitation(user.id)}>
-                                    <MailRepeat className="h-4 w-4" />
+                                    <RefreshCcw className="h-4 w-4" />
                                 </Button>
                              )}
                              <Button variant="outline" size="icon" onClick={() => handleImpersonate(user.id)}>
