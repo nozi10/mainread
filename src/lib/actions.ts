@@ -7,6 +7,7 @@ import { getSession, createSession } from './session';
 import type { User } from './db';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
+import { sendContactFormEmail } from './email';
 
 const SetupAccountSchema = z.object({
   username: z.string()
@@ -161,5 +162,30 @@ export async function setUsername(username: string): Promise<{ success: boolean;
     const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
     console.error('Failed to set username:', message);
     return { success: false, message };
+  }
+}
+
+const contactFormSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  message: z.string().min(10),
+});
+
+export async function sendContactMessage(formData: { name: string; email: string; message: string; }): Promise<{ success: boolean; message?: string }> {
+  const validation = contactFormSchema.safeParse(formData);
+
+  if (!validation.success) {
+    return { success: false, message: validation.error.errors.map(e => e.message).join(', ') };
+  }
+
+  const { name, email, message } = validation.data;
+  
+  try {
+    await sendContactFormEmail({ name, email, message });
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+    console.error('Failed to send contact message:', errorMessage);
+    return { success: false, message: errorMessage };
   }
 }

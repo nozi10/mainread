@@ -15,7 +15,12 @@ export default function LandingPage() {
             <BookOpen className="h-6 w-6 text-primary" />
             <span className="text-xl font-headline font-bold">Readify</span>
           </Link>
-          <nav>
+          <nav className="flex items-center gap-2">
+             <Button asChild variant="ghost">
+              <Link href="/contact">
+                Contact
+              </Link>
+            </Button>
             <Button asChild>
               <Link href="/login">
                 Login <ArrowRight className="ml-2 h-4 w-4" />

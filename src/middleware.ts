@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 
 const protectedRoutes = ['/read'];
-const publicRoutes = ['/', '/login', '/welcome', '/setup-account'];
+const publicRoutes = ['/', '/login', '/welcome', '/setup-account', '/contact'];
 const adminRoutes = ['/admin']; // This now includes /admin and /admin/*
 
 export async function middleware(req: NextRequest) {
@@ -37,10 +37,10 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL(url, req.nextUrl));
     }
     
-    // If a logged-in user is on the login page or landing page, redirect them to their dashboard
-    if (path === '/' || path === '/login') {
-      const url = session.isAdmin ? '/admin' : '/read';
-      return NextResponse.redirect(new URL(url, req.nextUrl));
+    // If a logged-in user is on a public page that isn't the contact page, redirect them
+    if (publicRoutes.includes(path) && path !== '/contact' && path !== '/') {
+        const url = session.isAdmin ? '/admin' : '/read';
+        return NextResponse.redirect(new URL(url, req.nextUrl));
     }
     
     // If a regular user tries to access an admin route, redirect them
