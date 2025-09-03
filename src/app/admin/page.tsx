@@ -13,6 +13,7 @@ import type { User as UserType, DocumentWithAuthorEmail as Document, AdminDashbo
 import AddUserDialog from '@/components/add-user-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TooltipProvider, Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -132,7 +133,7 @@ export default function AdminPage() {
   
 
   return (
-    <>
+    <TooltipProvider>
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
           <h1 className="text-2xl font-headline text-primary">Admin Panel</h1>
@@ -202,7 +203,7 @@ export default function AdminPage() {
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="week" />
                                 <YAxis allowDecimals={false} />
-                                <Tooltip />
+                                <UiTooltip contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                                 <Bar dataKey="signups" fill="hsl(var(--primary))" />
                             </BarChart>
                         </ResponsiveContainer>
@@ -263,16 +264,31 @@ export default function AdminPage() {
                         <TableCell>{user.username ? 'Active' : 'Pending Invitation'}</TableCell>
                         <TableCell className='space-x-1'>
                              {!user.username && (
-                                <Button variant="outline" size="icon" onClick={() => handleResendInvitation(user.id)}>
-                                    <RefreshCcw className="h-4 w-4" />
-                                </Button>
+                                <UiTooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="outline" size="icon" onClick={() => handleResendInvitation(user.id)}>
+                                            <RefreshCcw className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Resend Invitation</p></TooltipContent>
+                                </UiTooltip>
                              )}
-                             <Button variant="outline" size="icon" onClick={() => handleImpersonate(user.id)}>
-                                <LogIn className="h-4 w-4" />
-                             </Button>
-                            <Button variant="destructive" size="icon" onClick={() => handleDeleteUser(user.id)} disabled={user.isAdmin}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
+                             <UiTooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="outline" size="icon" onClick={() => handleImpersonate(user.id)}>
+                                        <LogIn className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Log in as User</p></TooltipContent>
+                             </UiTooltip>
+                            <UiTooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="destructive" size="icon" onClick={() => handleDeleteUser(user.id)} disabled={user.isAdmin}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Delete User</p></TooltipContent>
+                            </UiTooltip>
                         </TableCell>
                         </TableRow>
                     ))}
@@ -331,6 +347,6 @@ export default function AdminPage() {
         setIsAddUserOpen(false);
       }}
     />
-    </>
+    </TooltipProvider>
   );
 }
