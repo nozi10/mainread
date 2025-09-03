@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { getAvailableVoices, AvailableVoice } from '@/ai/flows/voice-selection';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { ScrollArea } from './ui/scroll-area';
 
 const passwordFormSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required.'),
@@ -193,95 +194,99 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
           <TabsTrigger value="danger">Danger Zone</TabsTrigger>
         </TabsList>
         <TabsContent value="profile" className="py-4">
-            <Form {...profileForm}>
-                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-                    <div className="flex items-center gap-6">
-                        <Avatar className="h-20 w-20">
-                            <AvatarImage src={avatarPreview || session.avatarUrl} data-ai-hint="user avatar" />
-                            <AvatarFallback>{session.name?.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <FormField
-                            control={profileForm.control}
-                            name="name"
-                            render={({ field }) => (
-                            <FormItem className="flex-1">
-                                <FormLabel>Display Name</FormLabel>
-                                <FormControl><Input {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                    </div>
-                     <FormItem>
-                        <FormLabel>Profile Picture</FormLabel>
-                        <FormControl>
-                            <Input name="avatar" type="file" accept="image/*" onChange={(e) => {
-                                if (e.target.files?.[0]) {
-                                    setAvatarPreview(URL.createObjectURL(e.target.files[0]));
-                                }
-                            }} />
-                        </FormControl>
-                        <FormDescription>Upload a new avatar. Max 2MB.</FormDescription>
+          <Form {...profileForm}>
+            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
+              <ScrollArea className="h-[60vh] pr-6">
+                <div className="space-y-6">
+                  <div className="flex items-center gap-6">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={avatarPreview || session.avatarUrl} data-ai-hint="user avatar" />
+                      <AvatarFallback>{session.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <FormField
+                      control={profileForm.control}
+                      name="name"
+                      render={({ field }) => (
+                      <FormItem className="flex-1">
+                          <FormLabel>Display Name</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormItem>
+                    <FormLabel>Profile Picture</FormLabel>
+                    <FormControl>
+                      <Input name="avatar" type="file" accept="image/*" onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                              setAvatarPreview(URL.createObjectURL(e.target.files[0]));
+                          }
+                      }} />
+                    </FormControl>
+                    <FormDescription>Upload a new avatar. Max 2MB.</FormDescription>
+                  </FormItem>
+                  
+                  <h3 className="pt-4 border-t text-lg font-medium">Reading Preferences</h3>
+                  
+                  <FormField
+                    control={profileForm.control}
+                    name="defaultVoice"
+                    render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Default Voice</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                          <SelectContent>
+                              {Object.entries(groupedVoices).map(([provider, voices]) => (
+                                  <SelectGroup key={provider}>
+                                      <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{provider.toUpperCase()}</Label>
+                                      {voices.map(v => <SelectItem key={v.name} value={v.name}>{v.displayName} ({v.gender})</SelectItem>)}
+                                  </SelectGroup>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                      <FormDescription>Your default voice for new documents.</FormDescription>
+                      <FormMessage />
                     </FormItem>
-                    
-                    <h3 className="pt-4 border-t text-lg font-medium">Reading Preferences</h3>
-                    
-                    <FormField
-                        control={profileForm.control}
-                        name="defaultVoice"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Default Voice</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                                <SelectContent>
-                                    {Object.entries(groupedVoices).map(([provider, voices]) => (
-                                        <SelectGroup key={provider}>
-                                            <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{provider.toUpperCase()}</Label>
-                                            {voices.map(v => <SelectItem key={v.name} value={v.name}>{v.displayName} ({v.gender})</SelectItem>)}
-                                        </SelectGroup>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormDescription>Your default voice for new documents.</FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={profileForm.control}
-                        name="defaultSpeakingRate"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Default Speaking Rate: {field.value?.toFixed(2)}x</FormLabel>
-                            <FormControl>
-                                <Slider min={0.25} max={4.0} step={0.25} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={profileForm.control}
-                        name="defaultZoomLevel"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Default PDF Zoom: {(field.value * 100).toFixed(0)}%</FormLabel>
-                            <FormControl>
-                                <Slider min={0.4} max={3.0} step={0.1} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <DialogFooter>
-                        <Button type="submit" disabled={isProfileLoading || !isProfileDirty}>
-                            {isProfileLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Changes
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </Form>
+                    )}
+                  />
+                  <FormField
+                    control={profileForm.control}
+                    name="defaultSpeakingRate"
+                    render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Default Speaking Rate: {field.value?.toFixed(2)}x</FormLabel>
+                      <FormControl>
+                          <Slider min={0.25} max={4.0} step={0.25} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={profileForm.control}
+                    name="defaultZoomLevel"
+                    render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Default PDF Zoom: {(field.value * 100).toFixed(0)}%</FormLabel>
+                      <FormControl>
+                          <Slider min={0.4} max={3.0} step={0.1} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                    )}
+                  />
+                </div>
+              </ScrollArea>
+              <DialogFooter className="pt-6">
+                <Button type="submit" disabled={isProfileLoading || !isProfileDirty}>
+                    {isProfileLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </TabsContent>
         <TabsContent value="security" className="py-4">
              <Form {...passwordForm}>
@@ -342,3 +347,5 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
     </DialogContent>
   );
 }
+
+    
