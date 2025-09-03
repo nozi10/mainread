@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn, Inbox } from 'lucide-react';
+import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn, Inbox, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { TooltipProvider, Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import AdminInbox from '@/components/admin-inbox';
 
-export default function AdminPage() {
+function AdminDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -379,3 +379,17 @@ export default function AdminPage() {
     </TooltipProvider>
   );
 }
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    }>
+      <AdminDashboard />
+    </Suspense>
+  );
+}
+
+    
