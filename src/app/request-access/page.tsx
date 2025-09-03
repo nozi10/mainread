@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
-import { Loader2, ArrowLeft, Send } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Loader2, ArrowLeft, Send, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { sendContactMessage } from '@/lib/actions';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from '@/components/ui/alert-dialog';
+import { useRouter } from 'next/navigation';
 
 const contactFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -26,6 +28,18 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 export default function RequestAccessPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isSuccess) {
+      timer = setTimeout(() => {
+        router.push('/');
+      }, 5000);
+    }
+    return () => clearTimeout(timer);
+  }, [isSuccess, router]);
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -41,10 +55,7 @@ export default function RequestAccessPage() {
     try {
       const result = await sendContactMessage(values);
       if (result.success) {
-        toast({
-          title: 'Request Sent!',
-          description: "Thanks for reaching out. We'll review your request and get back to you shortly.",
-        });
+        setIsSuccess(true);
         form.reset();
       } else {
         throw new Error(result.message || 'An unexpected error occurred.');
@@ -62,6 +73,18 @@ export default function RequestAccessPage() {
 
   return (
     <main className="flex items-center justify-center min-h-screen bg-background relative">
+      <AlertDialog open={isSuccess}>
+        <AlertDialogContent>
+          <AlertDialogHeader className="flex flex-col items-center text-center">
+            <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
+            <AlertDialogTitle className="text-2xl">Request Sent!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Thanks for reaching out. We'll review your request and get back to you shortly. You will be redirected to the homepage shortly.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="absolute top-4 left-4">
         <Button asChild variant="outline">
           <Link href="/">
