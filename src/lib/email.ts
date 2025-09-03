@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { WelcomeEmail } from '@/components/emails/welcome-email';
 import { ContactFormEmail } from '@/components/emails/contact-form-email';
 import { RejectionEmail } from '@/components/emails/rejection-email';
+import { GeneralContactFormEmail } from '@/components/emails/general-contact-form-email';
 
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -44,9 +45,9 @@ export async function sendWelcomeEmail(
 export async function sendContactFormEmail({ name, email, message, approveUrl, rejectUrl }: { name: string, email: string, message: string, approveUrl: string, rejectUrl: string }) {
     try {
         const { data, error } = await resend.emails.send({
-            from: `Readify Contact Form <${fromEmail}>`,
+            from: `Readify Access Request <${fromEmail}>`,
             to: toEmail,
-            subject: `New Readify Inquiry from ${name}`,
+            subject: `New Readify Access Request from ${name}`,
             reply_to: email,
             react: ContactFormEmail({ name, email, message, approveUrl, rejectUrl }),
         });
@@ -56,15 +57,41 @@ export async function sendContactFormEmail({ name, email, message, approveUrl, r
             throw new Error(`Resend failed: ${error.message}`);
         }
 
-        console.log('Contact form email sent successfully:', data?.id);
+        console.log('Access request email sent successfully:', data?.id);
         return data;
 
     } catch (error) {
         console.error('Error in sendContactFormEmail:', error);
         const message = error instanceof Error ? error.message : JSON.stringify(error);
-        throw new Error(`Failed to send contact email: ${message}`);
+        throw new Error(`Failed to send access request email: ${message}`);
     }
 }
+
+export async function sendGeneralEmail({ name, email, message }: { name: string, email: string, message: string }) {
+    try {
+        const { data, error } = await resend.emails.send({
+            from: `Readify Contact <${fromEmail}>`,
+            to: toEmail,
+            subject: `General Inquiry from ${name}`,
+            reply_to: email,
+            react: GeneralContactFormEmail({ name, email, message }),
+        });
+
+        if (error) {
+            console.error('Resend Error:', error);
+            throw new Error(`Resend failed: ${error.message}`);
+        }
+
+        console.log('General contact email sent successfully:', data?.id);
+        return data;
+
+    } catch (error) {
+        console.error('Error in sendGeneralEmail:', error);
+        const message = error instanceof Error ? error.message : JSON.stringify(error);
+        throw new Error(`Failed to send general contact email: ${message}`);
+    }
+}
+
 
 export async function sendRejectionEmail(to: string) {
     try {

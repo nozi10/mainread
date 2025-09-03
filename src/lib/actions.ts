@@ -7,7 +7,7 @@ import { getSession, createSession } from './session';
 import type { User } from './db';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { sendContactFormEmail } from './email';
+import { sendContactFormEmail, sendGeneralEmail } from './email';
 import { randomUUID } from 'crypto';
 
 const SetupAccountSchema = z.object({
@@ -197,6 +197,25 @@ export async function sendContactMessage(formData: { name: string; email: string
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
     console.error('Failed to send contact message:', errorMessage);
+    return { success: false, message: errorMessage };
+  }
+}
+
+export async function sendGeneralContactMessage(formData: { name: string; email: string; message: string; }): Promise<{ success: boolean; message?: string }> {
+  const validation = contactFormSchema.safeParse(formData);
+
+  if (!validation.success) {
+    return { success: false, message: validation.error.errors.map(e => e.message).join(', ') };
+  }
+  
+  const { name, email, message } = validation.data;
+
+  try {
+    await sendGeneralEmail({ name, email, message });
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+    console.error('Failed to send general contact message:', errorMessage);
     return { success: false, message: errorMessage };
   }
 }

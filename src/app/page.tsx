@@ -1,10 +1,11 @@
 
 'use client';
 
-import { ArrowRight, BookOpen, Mic, BrainCircuit } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Mic, BrainCircuit } from 'lucide-react';
 
 export default function LandingPage() {
   return (
@@ -39,8 +40,8 @@ export default function LandingPage() {
               </div>
               <div className="flex flex-col gap-2 min-[400px]:flex-row pt-4">
                 <Button asChild size="lg">
-                  <Link href="/contact">
-                    Contact Us
+                  <Link href="/request-access">
+                    Request Access
                   </Link>
                 </Button>
               </div>

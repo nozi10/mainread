@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Loader2, ArrowLeft, Send } from 'lucide-react';
 import Link from 'next/link';
-import { sendGeneralContactMessage } from '@/lib/actions';
+import { sendContactMessage } from '@/lib/actions';
 
 const contactFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -23,7 +23,7 @@ const contactFormSchema = z.object({
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
 
-export default function ContactPage() {
+export default function RequestAccessPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,11 +39,11 @@ export default function ContactPage() {
   const onSubmit = async (values: ContactFormValues) => {
     setIsLoading(true);
     try {
-      const result = await sendGeneralContactMessage(values);
+      const result = await sendContactMessage(values);
       if (result.success) {
         toast({
-          title: 'Message Sent!',
-          description: "Thanks for reaching out. We'll get back to you as soon as possible.",
+          title: 'Request Sent!',
+          description: "Thanks for reaching out. We'll review your request and get back to you shortly.",
         });
         form.reset();
       } else {
@@ -72,8 +72,8 @@ export default function ContactPage() {
       </div>
       <Card className="w-full max-w-lg shadow-2xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-4xl font-headline text-primary">Contact Us</CardTitle>
-          <CardDescription>Have a question or feedback? Let us know!</CardDescription>
+          <CardTitle className="text-4xl font-headline text-primary">Request Access to Readify</CardTitle>
+          <CardDescription>Fill out the form below to request an account. We'll review your request and get back to you shortly.</CardDescription>
         </CardHeader>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">
@@ -88,7 +88,7 @@ export default function ContactPage() {
                {form.formState.errors.email && <p className="text-sm font-medium text-destructive">{form.formState.errors.email.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="message">Your Message</Label>
+              <Label htmlFor="message">Tell us a bit about why you'd like to use our app</Label>
               <Textarea id="message" {...form.register('message')} rows={5} />
                {form.formState.errors.message && <p className="text-sm font-medium text-destructive">{form.formState.errors.message.message}</p>}
             </div>
@@ -96,7 +96,7 @@ export default function ContactPage() {
           <CardFooter>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <Loader2 className="animate-spin" /> : <Send className="mr-2" />}
-              {isLoading ? 'Sending...' : 'Send Message'}
+              {isLoading ? 'Sending...' : 'Submit Request'}
             </Button>
           </CardFooter>
         </form>
