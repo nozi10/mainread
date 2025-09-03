@@ -48,7 +48,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   };
 
   const onDocumentLoadError = (error: Error) => {
-    // Ignore AbortException which is a non-critical warning
     if (error.name === 'AbortException') {
         return;
     }
@@ -61,7 +60,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   };
 
   const textRenderer = useCallback((textItem: any) => {
-    if (!highlight || !documentText) {
+    if (!highlight || !documentText || !textItem.str) {
       return textItem.str;
     }
     
@@ -130,13 +129,4 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   );
 };
 
-export default React.memo(PdfViewer, (prevProps, nextProps) => {
-    // Custom comparison function
-    return (
-        prevProps.file === nextProps.file &&
-        prevProps.zoomLevel === nextProps.zoomLevel &&
-        prevProps.documentText === nextProps.documentText &&
-        prevProps.highlight?.start === nextProps.highlight?.start &&
-        prevProps.highlight?.end === nextProps.highlight?.end
-    );
-});
+export default PdfViewer;

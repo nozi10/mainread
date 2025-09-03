@@ -329,31 +329,32 @@ export default function ReadPage() {
   }
 
   const handleAudioTimeUpdate = () => {
-      if (!audioRef.current) return;
-      const currentTimeMs = audioRef.current.currentTime * 1000;
-      setAudioCurrentTime(audioRef.current.currentTime);
+    if (!audioRef.current) return;
+    const currentTimeMs = audioRef.current.currentTime * 1000;
+    setAudioCurrentTime(audioRef.current.currentTime);
 
-      if (audioDuration > 0) {
-          setAudioProgress((audioRef.current.currentTime / audioDuration) * 100);
-      }
+    if (audioDuration > 0) {
+        setAudioProgress((audioRef.current.currentTime / audioDuration) * 100);
+    }
 
-      if (speechMarks.length > 0) {
-        const currentWord = speechMarks.find(mark => mark.type === 'word' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 10)); // Heuristic for word duration
-        const currentSentence = speechMarks.find(mark => mark.type === 'sentence' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 20));
-        
-        let newHighlight: Highlight | null = null;
-        if (currentWord) {
-            newHighlight = { type: 'word', start: currentWord.start, end: currentWord.end };
-        } else if (currentSentence) {
-            newHighlight = { type: 'sentence', start: currentSentence.start, end: currentSentence.end };
-        }
-        
-        // Only update state if the highlight has changed to prevent rapid re-renders
-        if (newHighlight?.start !== currentHighlight?.start || newHighlight?.end !== currentHighlight?.end) {
-            setCurrentHighlight(newHighlight);
-        }
+    if (speechMarks.length > 0) {
+      const currentWord = speechMarks.find(mark => mark.type === 'word' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 10));
+      const currentSentence = speechMarks.find(mark => mark.type === 'sentence' && currentTimeMs >= mark.time && currentTimeMs < (mark.time + (mark.end - mark.start) * 20));
+      
+      let newHighlight: Highlight | null = null;
+      if (currentWord) {
+          newHighlight = { type: 'word', start: currentWord.start, end: currentWord.end };
+      } else if (currentSentence) {
+          newHighlight = { type: 'sentence', start: currentSentence.start, end: currentSentence.end };
       }
+      
+      if ((newHighlight === null && currentHighlight !== null) || 
+          (newHighlight && (!currentHighlight || newHighlight.start !== currentHighlight.start || newHighlight.end !== currentHighlight.end))) {
+        setCurrentHighlight(newHighlight);
+      }
+    }
   }
+
 
   const handlePreviewVoice = async (voice: string) => {
     try {
@@ -1025,5 +1026,3 @@ export default function ReadPage() {
     </TooltipProvider>
   );
 }
-
-    
