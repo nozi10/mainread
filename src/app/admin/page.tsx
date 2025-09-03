@@ -3,33 +3,37 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TestTube2 } from 'lucide-react';
+import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TestTube2, TrendingUp, MailRepeat, LogIn } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getAllUsers, getAllDocuments, deleteUser, deleteDocumentAsAdmin } from '@/lib/admin-actions';
-import type { User as UserType, DocumentWithAuthorEmail as Document } from '@/lib/admin-actions';
+import { getAllUsers, getAllDocuments, deleteUser, deleteDocumentAsAdmin, getAdminDashboardStats, resendInvitation } from '@/lib/admin-actions';
+import type { User as UserType, DocumentWithAuthorEmail as Document, AdminDashboardStats } from '@/lib/admin-actions';
 import AddUserDialog from '@/components/add-user-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserType[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
   const fetchAdminData = async () => {
     setIsLoading(true);
     try {
-      const [usersData, documentsData] = await Promise.all([
+      const [usersData, documentsData, statsData] = await Promise.all([
         getAllUsers(),
         getAllDocuments(),
+        getAdminDashboardStats(),
       ]);
       setUsers(usersData);
       setDocuments(documentsData);
+      setStats(statsData);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -65,6 +69,42 @@ export default function AdminPage() {
     }
   };
 
+  const handleResendInvitation = async (userId: string) => {
+      try {
+        const result = await resendInvitation(userId);
+        if(result.success) {
+            toast({ title: 'Success', description: 'Invitation has been resent.' });
+            fetchAdminData();
+        } else {
+            throw new Error(result.message);
+        }
+      } catch (error) {
+           toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: error instanceof Error ? error.message : 'Failed to resend invitation.',
+            });
+      }
+  }
+  
+  const handleImpersonate = async (userId: string) => {
+      if(confirm('Are you sure you want to log in as this user? Your current admin session will be temporarily replaced.')) {
+        // Implement this API route next
+        // const response = await fetch('/api/admin/impersonate', {
+        //     method: 'POST',
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify({ userId }),
+        // });
+        // if(response.ok) {
+        //     router.push('/read');
+        // } else {
+        //     const data = await response.json();
+        //     toast({ variant: 'destructive', title: 'Error', description: data.message || 'Could not impersonate user.' });
+        // }
+        toast({ title: 'Coming Soon', description: 'User impersonation will be implemented soon.' });
+      }
+  }
+
   const handleDeleteDocument = async (docId: string) => {
     if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
         try {
@@ -89,6 +129,7 @@ export default function AdminPage() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/');
   };
+  
 
   return (
     <>
@@ -113,14 +154,23 @@ export default function AdminPage() {
           </TabsList>
           
           <TabsContent value="dashboard" className="pt-6">
-             <div className="grid gap-4 md:grid-cols-2">
+             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Users</CardTitle>
                     <Users className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{users.length}</div>
+                    <div className="text-2xl font-bold">{stats?.totalUsers}</div>
+                  </CardContent>
+                </Card>
+                 <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">New Users (30d)</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">+{stats?.newUsersLast30Days}</div>
                   </CardContent>
                 </Card>
                 <Card>
@@ -129,8 +179,58 @@ export default function AdminPage() {
                     <File className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{documents.length}</div>
+                    <div className="text-2xl font-bold">{stats?.totalDocuments}</div>
                   </CardContent>
+                </Card>
+                 <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Documents Uploaded (30d)</CardTitle>
+                    <File className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">+{stats?.docsUploadedLast30Days}</div>
+                  </CardContent>
+                </Card>
+            </div>
+            <div className='grid gap-4 md:grid-cols-2 mt-6'>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className='flex items-center gap-2'><TrendingUp /> User Growth</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={stats?.userSignupsByWeek}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="week" />
+                                <YAxis allowDecimals={false} />
+                                <Tooltip />
+                                <Bar dataKey="signups" fill="hsl(var(--primary))" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Top Users by Documents</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                       <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Documents</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {stats?.topUsersByDocs.map(user => (
+                                    <TableRow key={user.id}>
+                                        <TableCell>{user.email}</TableCell>
+                                        <TableCell>{user.docCount}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
                 </Card>
             </div>
           </TabsContent>
@@ -151,6 +251,7 @@ export default function AdminPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Signed Up</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Actions</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -160,9 +261,18 @@ export default function AdminPage() {
                         <TableCell>{user.email}</TableCell>
                         <TableCell>{user.isAdmin ? 'Admin' : 'User'}</TableCell>
                         <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell>
+                        <TableCell>{user.username ? 'Active' : 'Pending Invitation'}</TableCell>
+                        <TableCell className='space-x-1'>
+                             {!user.username && (
+                                <Button variant="outline" size="icon" onClick={() => handleResendInvitation(user.id)}>
+                                    <MailRepeat className="h-4 w-4" />
+                                </Button>
+                             )}
+                             <Button variant="outline" size="icon" onClick={() => handleImpersonate(user.id)}>
+                                <LogIn className="h-4 w-4" />
+                             </Button>
                             <Button variant="destructive" size="icon" onClick={() => handleDeleteUser(user.id)} disabled={user.isAdmin}>
-                            <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                             </Button>
                         </TableCell>
                         </TableRow>
@@ -178,7 +288,7 @@ export default function AdminPage() {
                 <CardHeader className="flex items-center gap-2 flex-row">
                     <FileText />
                     <CardTitle>Document Management</CardTitle>
-                </CardHeader>
+                </Header>
                 <CardContent>
                 <Table>
                     <TableHeader>
@@ -225,3 +335,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    

@@ -239,3 +239,5 @@ export async function clearChatHistory(docId: string, isStaging: boolean = false
 
     return updatedDoc;
 }
+
+    
