@@ -6,6 +6,8 @@ import dynamic from 'next/dynamic';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Document } from '@/lib/db';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import TextToSpeechTab from './text-to-speech-tab';
 
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), { 
   ssr: false,
@@ -24,6 +26,7 @@ type MainContentProps = {
   pdfZoomLevel: number;
   onFileChange: (files: FileList | null) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
+  onGenerateTextAudio: (text: string) => Promise<{ success: boolean; audioUrl?: string; error?: string }>;
 };
 
 export default function MainContent({
@@ -33,6 +36,7 @@ export default function MainContent({
   pdfZoomLevel,
   onFileChange,
   fileInputRef,
+  onGenerateTextAudio,
 }: MainContentProps) {
   
   const getUploadMessage = () => {
@@ -74,23 +78,34 @@ export default function MainContent({
         onFileChange(e.dataTransfer.files);
       }}
     >
-      <div className="text-center p-8 border-2 border-dashed border-muted-foreground/30 rounded-xl max-w-lg w-full">
-        <UploadCloud className="mx-auto h-16 w-16 text-muted-foreground/50" />
-        <h3 className="mt-4 text-2xl font-headline">Prepare a New Document</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Drag and drop a PDF file here, or click the button below to select one.
-        </p>
-        <Button className="mt-6" onClick={() => fileInputRef.current?.click()}>
-          Select PDF File
-        </Button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={(e) => onFileChange(e.target.files)}
-          accept="application/pdf"
-          className="hidden"
-        />
-      </div>
+      <Tabs defaultValue="document" className="w-full max-w-2xl">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="document">Document Reader</TabsTrigger>
+          <TabsTrigger value="tts">Text-to-Speech</TabsTrigger>
+        </TabsList>
+        <TabsContent value="document">
+            <div className="text-center mt-6 p-8 border-2 border-dashed border-muted-foreground/30 rounded-xl">
+                <UploadCloud className="mx-auto h-16 w-16 text-muted-foreground/50" />
+                <h3 className="mt-4 text-2xl font-headline">Prepare a New Document</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                Drag and drop a PDF file here, or click the button below to select one.
+                </p>
+                <Button className="mt-6" onClick={() => fileInputRef.current?.click()}>
+                Select PDF File
+                </Button>
+                <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => onFileChange(e.target.files)}
+                accept="application/pdf"
+                className="hidden"
+                />
+            </div>
+        </TabsContent>
+        <TabsContent value="tts">
+            <TextToSpeechTab onGenerate={onGenerateTextAudio} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

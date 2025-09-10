@@ -90,7 +90,6 @@ export default function ReadPage() {
           activeDocId={state.activeDoc?.id || null}
           onSelect={state.handleSelectDocument}
           onDelete={state.handleDeleteDocument}
-          onGenerateAudio={state.handleGenerateAudio}
           isAudioGenerating={state.isAudioGenerationRunning}
           onUploadNew={state.handleUploadNewDocumentClick}
         />
@@ -131,20 +130,21 @@ export default function ReadPage() {
               pdfZoomLevel={state.pdfZoomLevel}
               onFileChange={state.handleFileChange}
               fileInputRef={state.fileInputRef}
+              onGenerateTextAudio={state.handleGenerateTextAudio}
             />
           </main>
-          {(state.activeDoc || state.isAudioGenerationRunning) && (
+          {(state.activeDoc || state.isAudioGenerationRunning || state.localAudioUrl) && (
             <div className="absolute inset-x-0 bottom-0 z-10">
               <AudioPlayer
                 isSpeaking={state.isSpeaking}
                 processingStage={state.generationState}
                 processingMessage={state.getProcessingMessage()}
                 onPlayPause={state.handlePlayPause}
-                canPlay={!!(state.activeDoc?.audioUrl)}
+                canPlay={!!(state.activeDoc?.audioUrl || state.localAudioUrl)}
                 playbackRate={state.playbackRate}
                 onPlaybackRateChange={state.setPlaybackRate}
-                showDownload={!!state.activeDoc?.audioUrl}
-                downloadUrl={state.activeDoc?.audioUrl || ''}
+                showDownload={!!(state.activeDoc?.audioUrl || state.localAudioUrl)}
+                downloadUrl={state.activeDoc?.audioUrl || state.localAudioUrl || ''}
                 downloadFileName={`${state.activeDoc?.fileName?.replace(/\.pdf$/i, '') || 'audio'}.mp3`}
                 progress={state.audioProgress}
                 duration={state.audioDuration}

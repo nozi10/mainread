@@ -13,7 +13,6 @@ type DocumentLibraryProps = {
   activeDocId: string | null;
   onSelect: (doc: Document) => void;
   onDelete: (docId: string) => void;
-  onGenerateAudio: () => void;
   isAudioGenerating: boolean;
   onUploadNew: () => void;
 };
@@ -23,7 +22,6 @@ export default function DocumentLibrary({
   activeDocId,
   onSelect,
   onDelete,
-  onGenerateAudio,
   isAudioGenerating,
   onUploadNew,
 }: DocumentLibraryProps) {
@@ -72,11 +70,12 @@ export default function DocumentLibrary({
                 ) : (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onGenerateAudio} disabled={isAudioGenerating || activeDocId !== doc.id}>
-                        {isAudioGenerating && activeDocId === doc.id ? <Loader2 className="h-4 w-4 animate-spin text-destructive" /> : <Mic className="h-4 w-4" />}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" disabled={true}>
+                         {/* This button is now effectively disabled as generation happens on selection */}
+                        <Mic className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>{isAudioGenerating && activeDocId === doc.id ? 'Generating...' : 'Generate Audio'}</p></TooltipContent>
+                     <TooltipContent><p>Audio is generated on selection</p></TooltipContent>
                   </Tooltip>
                 )}
                 <Tooltip>
