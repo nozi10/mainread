@@ -166,7 +166,11 @@ export function useReadPage() {
 
     const handleUploadNewDocumentClick = () => {
         clearActiveDoc();
-        fileInputRef.current?.click();
+        // Clicks the hidden file input. If the user is on the TTS tab, this
+        // will just bring them back to the PDF upload view.
+        if (!activeDoc) {
+             fileInputRef.current?.click();
+        }
     };
     
     const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
@@ -198,7 +202,7 @@ export function useReadPage() {
           
           pollerRef.current = setInterval(async () => {
               try {
-                  const status = await checkAmazonVoiceGeneration(doc.id!);
+                  const status = await checkAmazonVoiceGeneration(result.pollyTaskId!);
                   if (status.status === 'completed' && status.audioUrl) {
                       if (pollerRef.current) clearInterval(pollerRef.current);
                       
