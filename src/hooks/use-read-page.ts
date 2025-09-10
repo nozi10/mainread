@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { getAvailableVoices, AvailableVoice } from '@/ai/flows/voice-selection';
@@ -11,12 +11,13 @@ import { chatWithPdf } from '@/ai/flows/chat-with-pdf';
 import { generateGlossary, GenerateGlossaryOutput } from '@/ai/flows/glossary-flow';
 import { generateQuiz, type GenerateQuizOutput } from '@/ai/flows/quiz-flow';
 import { getDocuments, saveDocument, Document, getUserSession, ChatMessage, deleteDocument, clearChatHistory, UserSession } from '@/lib/db';
-import AiDialog, { AiDialogType } from '@/components/ai-dialog';
+import { AiDialogType } from '@/components/ai-dialog';
 import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
 import { cleanPdfText } from '@/ai/flows/clean-text-flow';
 import { generateSpeech } from '@/ai/flows/generate-speech';
+import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
 
-type GenerationState = 'idle' | 'generating' | 'error';
+type GenerationState = 'idle' | 'generating' | 'polling' | 'error';
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
 
 async function mergeAudio(audioDataUris: string[]): Promise<Blob> {
@@ -68,9 +69,8 @@ export function useReadPage() {
     const router = useRouter();
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const previewAudioRef = useRef<HTMLAudioElement | null>(null);
-    const localAudioUrlRef = useRef<string | null>(null);
-    const chatWindowRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const pollerRef = useRef<NodeJS.Timeout | null>(null);
     
     const fetchUserDocuments = useCallback(async () => {
         try {
@@ -115,6 +115,12 @@ export function useReadPage() {
           }
         }
         fetchVoices();
+        
+        // Cleanup poller on unmount
+        return () => {
+            if (pollerRef.current) clearInterval(pollerRef.current);
+        }
+
     }, []);
 
     // Effect to handle auto-play when a new audioUrl appears
@@ -131,32 +137,17 @@ export function useReadPage() {
                 if (playPromise !== undefined) {
                     playPromise.catch(e => {
                         console.error("Autoplay failed:", e);
-                        setIsSpeaking(false); // Ensure state is correct on failure
-                        if (e.name === 'NotSupportedError') {
-                            toast({
-                                variant: "destructive",
-                                title: "Playback Error",
-                                description: "The audio source is invalid. This could be due to S3 permissions (CORS or public access) or a generation issue."
-                            });
-                        } else {
-                             toast({
-                                variant: "destructive",
-                                title: "Playback Error",
-                                description: "Could not auto-play audio. Please press play manually."
-                            });
-                        }
-                    });
+                        setIsSpeaking(false);
+                         toast({
+                            variant: "destructive",
+                            title: "Playback Error",
+                            description: "Could not auto-play audio. Please press play manually. This may be due to browser restrictions or an issue with the audio file (e.g., S3 CORS policy)."
+                        });
+                    }).then(() => setIsSpeaking(true));
                 }
             }
         }
-    }, [activeDoc, toast]);
-
-
-    useEffect(() => {
-        return () => {
-          if (localAudioUrlRef.current) URL.revokeObjectURL(localAudioUrlRef.current);
-        };
-    }, []);
+    }, [activeDoc?.audioUrl, toast]);
 
     const handleLogout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
@@ -172,14 +163,11 @@ export function useReadPage() {
             audioRef.current.src = "";
             audioRef.current.removeAttribute('src'); // Fully clear the source
         }
-        if (localAudioUrlRef.current) {
-            URL.revokeObjectURL(localAudioUrlRef.current);
-            localAudioUrlRef.current = null;
-        }
         setAudioDuration(0);
         setAudioCurrentTime(0);
         setAudioProgress(0);
         setGenerationState('idle');
+        if (pollerRef.current) clearInterval(pollerRef.current);
     };
 
     const handleUploadNewDocumentClick = () => {
@@ -217,7 +205,7 @@ export function useReadPage() {
             await audioRef.current.play();
           } catch (error) {
             console.error("Error playing audio:", error);
-            toast({ variant: "destructive", title: "Playback Error", description: "Could not play the audio file."});
+            toast({ variant: "destructive", title: "Playback Error", description: "Could not play the audio file. It might be invalid or a network issue occurred."});
           }
         }
     };
@@ -244,13 +232,36 @@ export function useReadPage() {
               fileName: activeDoc.fileName,
             });
           
-          let newAudioUrl: string | undefined;
-
-          if (result.audioUrl) {
-            // This is the direct S3 URL flow
-            newAudioUrl = result.audioUrl;
+          if (result.pollyTaskId) {
+            setGenerationState('polling');
+            toast({ title: "Processing Audio", description: "Amazon Polly is generating your audio in the background." });
+            
+            // Start polling
+            pollerRef.current = setInterval(async () => {
+                try {
+                    const status = await checkAmazonVoiceGeneration(result.pollyTaskId!);
+                    if (status.status === 'completed' && status.audioUrl) {
+                        if (pollerRef.current) clearInterval(pollerRef.current);
+                        const updatedDoc = await saveDocument({ id: activeDoc.id, audioUrl: status.audioUrl });
+                        setActiveDoc(updatedDoc);
+                        await fetchUserDocuments();
+                        setGenerationState('idle');
+                        toast({ title: "Success", description: "Audio ready and will play automatically." });
+                    } else if (status.status === 'failed') {
+                        if (pollerRef.current) clearInterval(pollerRef.current);
+                        setGenerationState('error');
+                        toast({ variant: "destructive", title: "Audio Error", description: "Amazon Polly failed to process the audio." });
+                    }
+                    // else: status is 'inProgress', so we just continue polling
+                } catch (pollError) {
+                    if (pollerRef.current) clearInterval(pollerRef.current);
+                    setGenerationState('error');
+                    toast({ variant: "destructive", title: "Polling Error", description: "Could not check audio generation status." });
+                }
+            }, 5000); // Poll every 5 seconds
+            
           } else if (result.audioDataUris && result.audioDataUris.length > 0) {
-            // This is the flow for providers that return data URIs
+            // This is the flow for providers that return data URIs (OpenAI, Lemonfox)
             const mergedAudioBlob = await mergeAudio(result.audioDataUris);
             const audioFileName = `${activeDoc.fileName.replace(/\.pdf$/i, '') || 'audio'}.mp3`;
             
@@ -263,17 +274,17 @@ export function useReadPage() {
             if (!uploadAudioResponse.ok) throw new Error('Audio Upload failed');
             
             const audioBlobResult = await uploadAudioResponse.json();
-            newAudioUrl = audioBlobResult.url;
+            const newAudioUrl = audioBlobResult.url;
+            
+            if (newAudioUrl) {
+                const updatedDoc = await saveDocument({ id: activeDoc.id, audioUrl: newAudioUrl });
+                setActiveDoc(updatedDoc); 
+                await fetchUserDocuments(); 
+                setGenerationState('idle');
+                toast({ title: "Success", description: "Audio generated and will play automatically." });
+            }
           } else {
             throw new Error("Audio generation resulted in no audio output.");
-          }
-          
-          if (newAudioUrl) {
-            const updatedDoc = await saveDocument({ id: activeDoc.id, audioUrl: newAudioUrl });
-            // This is crucial: we set the active doc directly to trigger the useEffect for playback
-            setActiveDoc(updatedDoc); 
-            await fetchUserDocuments(); 
-            toast({ title: "Success", description: "Audio generated and will play automatically." });
           }
 
         } catch (error: any) {
@@ -281,8 +292,6 @@ export function useReadPage() {
           const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
           toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio. ${errorMessage}` });
           setGenerationState('error');
-        } finally {
-          setGenerationState('idle');
         }
     };
 
@@ -326,7 +335,8 @@ export function useReadPage() {
     const handlePlayAiResponse = async (text: string) => {
         try {
           const result = await generateSpeech({ text, voice: selectedVoice, speakingRate: speakingRate });
-          const mergedAudioBlob = await mergeAudio(result.audioDataUris!);
+          if (!result.audioDataUris) throw new Error("No audio data returned");
+          const mergedAudioBlob = await mergeAudio(result.audioDataUris);
           const audioUrl = URL.createObjectURL(mergedAudioBlob);
           if (previewAudioRef.current) {
               previewAudioRef.current.src = audioUrl;
@@ -448,6 +458,7 @@ export function useReadPage() {
     const getProcessingMessage = () => {
         switch (generationState) {
             case 'generating': return 'Generating audio...';
+            case 'polling': return 'Processing audio...';
             case 'error': return 'An error occurred during audio generation.';
             default: return '';
         }
@@ -518,7 +529,7 @@ export function useReadPage() {
       }
     };
 
-    const isAudioGenerationRunning = generationState === 'generating';
+    const isAudioGenerationRunning = generationState === 'generating' || generationState === 'polling';
 
     return {
         activeDoc, setActiveDoc, documentText, setDocumentText,
@@ -528,7 +539,7 @@ export function useReadPage() {
         aiSummaryOutput, setAiSummaryOutput, aiQuizOutput, setAiQuizOutput, aiGlossaryOutput, setAiGlossaryOutput, session, setSession,
         generationState, setGenerationState, isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
         isUploading, setIsUploading, isFullScreen, setIsFullScreen, pdfZoomLevel, setPdfZoomLevel, isSavingZoom, setIsSavingZoom,
-        toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef,
+        toast, audioRef, previewAudioRef, fileInputRef,
         fetchSession, fetchUserDocuments, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument,
         handlePlayPause, handleGenerateAudio, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,

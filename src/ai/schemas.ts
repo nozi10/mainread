@@ -13,6 +13,7 @@ export type GenerateSpeechInput = z.infer<typeof GenerateSpeechInputSchema>;
 export const GenerateSpeechOutputSchema = z.object({
   audioDataUris: z.array(z.string()).optional().describe("An array of data URIs for the generated audio chunks. Each format: 'data:audio/mp3;base64,<encoded_data>'."),
   audioUrl: z.string().optional().describe("A single, final URL for audio stored in a cloud bucket (e.g., S3)."),
+  pollyTaskId: z.string().optional().describe("The task ID for an asynchronous Amazon Polly generation task."),
 });
 export type GenerateSpeechOutput = z.infer<typeof GenerateSpeechOutputSchema>;
 

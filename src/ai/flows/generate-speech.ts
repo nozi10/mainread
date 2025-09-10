@@ -14,7 +14,7 @@ import { GenerateSpeechInputSchema, GenerateSpeechOutputSchema, GenerateSpeechIn
 import { formatTextForSpeech } from './format-text-for-speech';
 import { generateOpenAIVoice } from './speech-generation/openai';
 import { generateLemonfoxVoice } from './speech-generation/lemonfox';
-import { generateAmazonVoice } from './speech-generation/amazon-async';
+import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
 
 
 // This function can be directly called from client components as a Server Action.
@@ -34,7 +34,7 @@ export async function generateSpeech(
         const [provider, voiceName] = input.voice.split('/');
         const speakingRate = input.speakingRate || 1.0;
         let audioDataUris: string[] = [];
-        let audioUrl: string | undefined;
+        let pollyTaskId: string | undefined;
 
         switch (provider) {
             case 'openai':
@@ -44,16 +44,20 @@ export async function generateSpeech(
                 audioDataUris = await generateLemonfoxVoice(formattedText, voiceName, speakingRate);
                 break;
             case 'amazon':
-                if (!input.docId || !input.fileName) {
-                    throw new Error('docId and fileName are required for Amazon Polly generation.');
+                if (!input.docId) {
+                    throw new Error('docId is required for Amazon Polly generation.');
                 }
-                // For Amazon, we do the full generation and upload process, then return the final URL
-                audioUrl = await generateAmazonVoice(formattedText, voiceName, speakingRate, input.docId, input.fileName);
-                return { audioUrl };
+                const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId);
+                pollyTaskId = taskId;
+                break;
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);
         }
 
+        if (pollyTaskId) {
+            return { pollyTaskId };
+        }
+        
         if (audioDataUris.length === 0) {
             throw new Error("No audio was generated.");
         }
