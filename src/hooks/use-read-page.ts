@@ -121,19 +121,36 @@ export function useReadPage() {
 
     // Effect to handle auto-play when a new audioUrl appears
     useEffect(() => {
-        if (activeDoc?.audioUrl && audioRef.current) {
+        if (audioRef.current && activeDoc?.audioUrl) {
             const currentSrc = audioRef.current.src;
-            // Check if the new URL is different from what's already in the player
-            if (currentSrc !== activeDoc.audioUrl) {
-                audioRef.current.src = activeDoc.audioUrl;
+            const newSrc = activeDoc.audioUrl;
+            
+            // Only update and play if the source is new and valid
+            if (newSrc && currentSrc !== newSrc) {
+                audioRef.current.src = newSrc;
                 audioRef.current.load();
-                audioRef.current.play().catch(e => {
-                    console.error("Autoplay failed. User interaction may be required.", e);
-                    // Optionally, inform the user that they might need to click play manually.
-                });
+                const playPromise = audioRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => {
+                        console.error("Autoplay failed:", e);
+                        if (e.name === 'NotSupportedError') {
+                            toast({
+                                variant: "destructive",
+                                title: "Playback Error",
+                                description: "The audio format from S3 might be invalid or there's a CORS issue. Please check your S3 bucket permissions and CORS configuration."
+                            });
+                        } else {
+                             toast({
+                                variant: "destructive",
+                                title: "Playback Error",
+                                description: "Could not auto-play audio. Please press play manually."
+                            });
+                        }
+                    });
+                }
             }
         }
-    }, [activeDoc?.audioUrl]);
+    }, [activeDoc?.audioUrl, toast]);
 
 
     useEffect(() => {
@@ -152,7 +169,10 @@ export function useReadPage() {
         setActiveDoc(null);
         setDocumentText('');
         setIsChatOpen(false);
-        if (audioRef.current) audioRef.current.src = "";
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.src = "";
+        }
         if (localAudioUrlRef.current) {
             URL.revokeObjectURL(localAudioUrlRef.current);
             localAudioUrlRef.current = null;
@@ -222,19 +242,22 @@ export function useReadPage() {
           if (result.asyncTaskId) {
             setGenerationState('polling');
             toast({ title: "Processing Audio", description: "Your audio is being generated in the background. We'll notify you when it's ready." });
-            // Start polling
+            
             pollingIntervalRef.current = setInterval(async () => {
                 try {
+                    if (!activeDoc?.id) { // Check if doc is still active
+                        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                        return;
+                    }
                     const pollResult = await checkAmazonVoiceGeneration({ docId: activeDoc.id! });
                     if (pollResult.status === 'completed') {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                         setGenerationState('idle');
                         toast({ title: "Success", description: "Audio is ready and will play automatically." });
-                        // Directly update active doc to trigger auto-play effect
                         if (pollResult.audioUrl) {
+                            // This is the critical fix: directly update the active doc state
                             setActiveDoc(prevDoc => prevDoc ? { ...prevDoc, audioUrl: pollResult.audioUrl } : null);
                         }
-                        await fetchUserDocuments();
                     } else if (pollResult.status === 'failed') {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                         setGenerationState('error');
@@ -245,7 +268,7 @@ export function useReadPage() {
                     setGenerationState('error');
                     console.error("Polling error", pollError);
                 }
-            }, 5000); // Poll every 5 seconds
+            }, 5000);
             return;
           }
 
@@ -269,7 +292,7 @@ export function useReadPage() {
           const newAudioUrl = audioBlobResult.url;
           
           const updatedDoc = await saveDocument({ id: activeDoc.id, audioUrl: newAudioUrl });
-          setActiveDoc(updatedDoc); // This will trigger the auto-play effect
+          setActiveDoc(updatedDoc);
           await fetchUserDocuments(); 
 
           toast({ title: "Success", description: "Audio generated and will play automatically." });
@@ -279,7 +302,7 @@ export function useReadPage() {
           toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio. ${errorMessage}` });
           setGenerationState('error');
         } finally {
-            if (generationState === 'generating') { // only set to idle if not polling
+            if (generationState === 'generating') { 
                 setGenerationState('idle');
             }
         }
@@ -525,7 +548,7 @@ export function useReadPage() {
         isSpeaking, setIsSpeaking, audioProgress, setAudioProgress, audioDuration, setAudioDuration, audioCurrentTime, setAudioCurrentTime,
         availableVoices, setAvailableVoices, selectedVoice, setSelectedVoice, speakingRate, setSpeakingRate, playbackRate, setPlaybackRate,
         userDocuments, setUserDocuments, isAiDialogOpen, setIsAiDialogOpen, aiDialogType, setAiDialogType, aiIsLoading, setAiIsLoading,
-        aiSummaryOutput, setAiSummaryOutput, aiQuizOutput, setAiQuizOutput, aiGlossaryOutput, setAiGlossaryOutput, session, setSession,
+        aiSummaryOutput, setAiSummaryOutput, aiQuizOutput, setAiQuizOutput, aiGlossaryOutput, setAiGlossyOutput, session, setSession,
         generationState, setGenerationState, isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
         isUploading, setIsUploading, isFullScreen, setIsFullScreen, pdfZoomLevel, setPdfZoomLevel, isSavingZoom, setIsSavingZoom,
         toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef,
@@ -536,3 +559,5 @@ export function useReadPage() {
         isAudioGenerationRunning
     };
 }
+
+    
