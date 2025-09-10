@@ -1,20 +1,28 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
 import Script from 'next/script';
+import ImpersonationBanner from '@/components/impersonation-banner';
+import { getSession } from '@/lib/session';
+import { cookies } from 'next/headers';
 
 export const metadata: Metadata = {
   title: 'Readify',
   description: 'A PDF viewer and reader with text-to-speech capabilities.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSession();
+  const impersonatorId = cookies().get('impersonator_id')?.value;
+  const isImpersonating = !!impersonatorId && session?.isAdmin === false;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -29,6 +37,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          {isImpersonating && <ImpersonationBanner />}
           {children}
           <Toaster />
         </ThemeProvider>

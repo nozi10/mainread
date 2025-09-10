@@ -1,6 +1,8 @@
+
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
+import type { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 
 const secretKey = process.env.JWT_SECRET || 'your-secret-key-for-development';
 const key = new TextEncoder().encode(secretKey);
@@ -40,13 +42,19 @@ export async function getSession(): Promise<SessionPayload | null> {
   return session;
 }
 
-export async function createSession(userId: string, isAdmin: boolean, username: string | null) {
+// Accept an optional cookie store for use in Route Handlers
+export async function createSession(
+    userId: string, 
+    isAdmin: boolean, 
+    username: string | null,
+    cookieStore: ReturnType<typeof cookies> | { set: (name: string, value: string, options: Partial<ResponseCookie>) => void } = cookies()
+) {
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     const sessionPayload = { userId, isAdmin, username };
     
     const session = await encrypt(sessionPayload);
 
-    cookies().set('session', session, {
+    cookieStore.set('session', session, {
       expires,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

@@ -108,19 +108,17 @@ function AdminDashboard() {
   
   const handleImpersonate = async (userId: string) => {
       if(confirm('Are you sure you want to log in as this user? Your current admin session will be temporarily replaced.')) {
-        // Implement this API route next
-        // const response = await fetch('/api/admin/impersonate', {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify({ userId }),
-        // });
-        // if(response.ok) {
-        //     router.push('/read');
-        // } else {
-        //     const data = await response.json();
-        //     toast({ variant: 'destructive', title: 'Error', description: data.message || 'Could not impersonate user.' });
-        // }
-        toast({ title: 'Coming Soon', description: 'User impersonation will be implemented soon.' });
+        const response = await fetch('/api/admin/impersonate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        });
+        if(response.ok) {
+            router.push('/read');
+        } else {
+            const data = await response.json();
+            toast({ variant: 'destructive', title: 'Error', description: data.message || 'Could not impersonate user.' });
+        }
       }
   }
 
@@ -300,7 +298,7 @@ function AdminDashboard() {
                              )}
                              <UiTooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="outline" size="icon" onClick={() => handleImpersonate(user.id)}>
+                                    <Button variant="outline" size="icon" onClick={() => handleImpersonate(user.id)} disabled={user.isAdmin}>
                                         <LogIn className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
@@ -397,5 +395,3 @@ export default function AdminPage() {
     </Suspense>
   );
 }
-
-    
