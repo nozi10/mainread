@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, 'react, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn, Inbox, Loader2, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
