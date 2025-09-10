@@ -105,8 +105,6 @@ export default function ReadPage() {
               isUploading={state.isUploading}
               uploadStage={state.uploadStage}
               pdfZoomLevel={state.pdfZoomLevel}
-              currentHighlight={state.currentHighlight}
-              documentText={state.documentText}
               onFileChange={state.handleFileChange}
               fileInputRef={state.fileInputRef}
             />
@@ -115,13 +113,13 @@ export default function ReadPage() {
             <div className="absolute inset-x-0 bottom-0 z-10">
               <AudioPlayer
                 isSpeaking={state.isSpeaking}
-                processingStage={state.activeDoc?.audioGenerationTaskId ? 'polling' : state.generationState}
+                processingStage={state.generationState}
                 processingMessage={state.getProcessingMessage()}
                 onPlayPause={state.handlePlayPause}
                 canPlay={!!(state.activeDoc?.audioUrl)}
                 playbackRate={state.playbackRate}
                 onPlaybackRateChange={state.setPlaybackRate}
-                showDownload={!!state.activeDoc?.audioUrl && !state.activeDoc?.audioUrl.includes('s3.amazonaws.com') && !state.isAudioGenerationRunning}
+                showDownload={!!state.activeDoc?.audioUrl}
                 downloadUrl={state.activeDoc?.audioUrl || ''}
                 downloadFileName={`${state.activeDoc?.fileName?.replace(/\.pdf$/i, '') || 'audio'}.mp3`}
                 progress={state.audioProgress}
@@ -162,7 +160,6 @@ export default function ReadPage() {
           onPause={() => state.setIsSpeaking(false)}
           onEnded={() => {
             state.setIsSpeaking(false);
-            state.setCurrentHighlight(null);
           }} 
           onLoadedMetadata={(e) => state.setAudioDuration(e.currentTarget.duration)}
           onTimeUpdate={state.handleAudioTimeUpdate}

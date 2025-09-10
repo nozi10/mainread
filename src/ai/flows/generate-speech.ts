@@ -13,7 +13,6 @@ import { ai } from '@/ai/genkit';
 import { GenerateSpeechInputSchema, GenerateSpeechOutputSchema, GenerateSpeechInput } from '@/ai/schemas';
 import { formatTextForSpeech } from './format-text-for-speech';
 import { generateOpenAIVoice } from './speech-generation/openai';
-import { generateAmazonVoice, SpeechMark } from './speech-generation/amazon';
 import { generateLemonfoxVoice } from './speech-generation/lemonfox';
 
 
@@ -34,16 +33,10 @@ export async function generateSpeech(
         const [provider, voiceName] = input.voice.split('/');
         const speakingRate = input.speakingRate || 1.0;
         let audioDataUris: string[] = [];
-        let speechMarks: SpeechMark[] | undefined = undefined;
 
         switch (provider) {
             case 'openai':
                 audioDataUris = await generateOpenAIVoice(formattedText, voiceName, speakingRate);
-                break;
-            case 'amazon':
-                const amazonResult = await generateAmazonVoice(formattedText, voiceName);
-                audioDataUris = amazonResult.audioDataUris;
-                speechMarks = amazonResult.speechMarks;
                 break;
             case 'lemonfox':
                 audioDataUris = await generateLemonfoxVoice(formattedText, voiceName, speakingRate);
@@ -56,7 +49,7 @@ export async function generateSpeech(
             throw new Error("No audio was generated.");
         }
 
-        return { audioDataUris, speechMarks };
+        return { audioDataUris };
 
     } catch (error: any) {
         console.error("Error in generateSpeech action:", error);

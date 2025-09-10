@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Document } from '@/lib/db';
-import type { Highlight } from '@/components/pdf-viewer';
 
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), { 
   ssr: false,
@@ -23,8 +22,6 @@ type MainContentProps = {
   isUploading: boolean;
   uploadStage: 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
   pdfZoomLevel: number;
-  currentHighlight: Highlight | null;
-  documentText: string;
   onFileChange: (files: FileList | null) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
 };
@@ -34,8 +31,6 @@ export default function MainContent({
   isUploading,
   uploadStage,
   pdfZoomLevel,
-  currentHighlight,
-  documentText,
   onFileChange,
   fileInputRef,
 }: MainContentProps) {
@@ -56,8 +51,6 @@ export default function MainContent({
       <PdfViewer
         file={activeDoc.pdfUrl}
         zoomLevel={pdfZoomLevel}
-        highlight={currentHighlight}
-        documentText={documentText}
       />
     );
   }

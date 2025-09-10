@@ -5,8 +5,6 @@ import { kv } from '@vercel/kv';
 import { del as deleteBlob } from '@vercel/blob';
 import { getSession, type SessionPayload } from './session';
 import { randomUUID } from 'crypto';
-import type { SpeechMark } from '@/ai/schemas';
-
 
 export interface ChatMessage {
   id: string;
@@ -30,8 +28,6 @@ export interface Document {
   pdfUrl: string;
   textContent: string; // Add this field to store cleaned text
   audioUrl: string | null;
-  audioGenerationTaskId?: string | null; // To track async Polly tasks
-  speechMarks?: SpeechMark[] | null;
   zoomLevel: number;
   createdAt: string;
   chatHistory?: ChatMessage[];
@@ -135,7 +131,6 @@ export async function saveDocument(docData: Partial<Document>): Promise<Document
       pdfUrl: docData.pdfUrl,
       textContent: docData.textContent,
       audioUrl: docData.audioUrl || null,
-      speechMarks: docData.speechMarks || null,
       zoomLevel: docData.zoomLevel || 1,
       createdAt: new Date().toISOString(),
       chatHistory: [],

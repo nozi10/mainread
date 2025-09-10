@@ -8,7 +8,6 @@
 import 'dotenv/config';
 import { ai } from '@/ai/genkit';
 import { PreviewSpeechInputSchema, PreviewSpeechOutputSchema } from '@/ai/schemas';
-import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import OpenAI from 'openai';
 
 async function handleOpenAIPreview(voice: string) {
@@ -27,36 +26,6 @@ async function handleOpenAIPreview(voice: string) {
     
     const audioBuffer = await audioResponse.arrayBuffer();
     return `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`;
-}
-
-async function handleAmazonPreview(voice: string) {
-    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
-        throw new Error('AWS credentials or region are not configured in environment variables.');
-    }
-    
-    const pollyClient = new PollyClient({
-        region: process.env.AWS_REGION,
-        credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        },
-    });
-
-    const command = new SynthesizeSpeechCommand({
-        Text: 'Hello! This is a preview of my voice.',
-        VoiceId: voice as any,
-        OutputFormat: 'mp3',
-        Engine: 'neural',
-    });
-    
-    const response = await pollyClient.send(command);
-
-    if (!response.AudioStream) {
-        throw new Error('Amazon Polly did not return audio.');
-    }
-
-    const audioBytes = await response.AudioStream.transformToByteArray();
-    return `data:audio/mp3;base64,${Buffer.from(audioBytes).toString('base64')}`;
 }
 
 async function handleLemonfoxPreview(voice: string) {
@@ -96,9 +65,6 @@ export const previewSpeech = ai.defineFlow(
         switch (provider) {
             case 'openai':
                 audioDataUri = await handleOpenAIPreview(voiceName);
-                break;
-            case 'amazon':
-                audioDataUri = await handleAmazonPreview(voiceName);
                 break;
             case 'lemonfox':
                 audioDataUri = await handleLemonfoxPreview(voiceName);
