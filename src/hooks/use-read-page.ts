@@ -150,7 +150,7 @@ export function useReadPage() {
                 }
             }
         }
-    }, [activeDoc?.audioUrl, toast]);
+    }, [activeDoc, toast]);
 
 
     useEffect(() => {

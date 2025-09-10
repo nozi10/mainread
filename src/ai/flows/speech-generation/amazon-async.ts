@@ -56,17 +56,10 @@ async function getS3FileUrl(s3Uri: string): Promise<string> {
     const url = new URL(s3Uri);
     const bucket = url.hostname;
     const key = url.pathname.substring(1); // remove leading '/'
-
-    // Get the bucket region
-    let region = process.env.AWS_REGION;
-    if(!region) {
-        console.warn("AWS_REGION not set, defaulting to us-east-1 for S3 URL construction. This may fail if your bucket is in a different region.");
-        region = 'us-east-1';
-    }
    
-    // Construct the public URL
-    // Format: https://<bucket-name>.s3.<region>.amazonaws.com/<key>
-    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+    // Construct the region-agnostic public URL format
+    // https://<bucket-name>.s3.amazonaws.com/<key>
+    return `https://${bucket}.s3.amazonaws.com/${key}`;
 }
 
 
