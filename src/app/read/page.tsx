@@ -131,6 +131,8 @@ export default function ReadPage() {
               onFileChange={state.handleFileChange}
               fileInputRef={state.fileInputRef}
               onGenerateTextAudio={state.handleGenerateTextAudio}
+              onTextExtracted={state.setPageTextItems}
+              highlightedSentence={state.highlightedSentence}
             />
           </main>
           {(state.activeDoc || state.isAudioGenerationRunning || state.localAudioUrl) && (

@@ -15,11 +15,29 @@ import { AiDialogType } from '@/components/ai-dialog';
 import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
 import { cleanPdfText } from '@/ai/flows/clean-text-flow';
 import { generateSpeech } from '@/ai/flows/generate-speech';
-import { startAmazonVoiceGeneration, checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
 import { mergeAudio } from '@/lib/audio-utils';
+import { startAmazonVoiceGeneration, checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
+import { generateAmazonVoiceSync } from '@/ai/flows/speech-generation/amazon-sync';
 
 type GenerationState = 'idle' | 'generating' | 'polling' | 'error';
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
+
+export interface TextItem {
+  str: string;
+  transform: number[];
+  width: number;
+  height: number;
+  dir: string;
+}
+
+export interface Sentence {
+  text: string;
+  pageNumber: number;
+  items: { x: number; y: number; width: number; height: number; text: string; pageNumber: number; }[];
+  startChar: number;
+  endChar: number;
+}
+
 
 export function useReadPage() {
     const [activeDoc, setActiveDoc] = useState<Document | null>(null);
@@ -49,6 +67,9 @@ export function useReadPage() {
     const [pdfZoomLevel, setPdfZoomLevel] = useState(1);
     const [isSavingZoom, setIsSavingZoom] = useState(false);
     const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
+    const [pageTextItems, setPageTextItemsState] = useState<Record<number, any[]>>({});
+    const [sentences, setSentences] = useState<Sentence[]>([]);
+    const [highlightedSentence, setHighlightedSentence] = useState<Sentence | null>(null);
 
     const { toast } = useToast();
     const router = useRouter();
@@ -59,6 +80,83 @@ export function useReadPage() {
     const localAudioUrlRef = useRef<string | null>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
     
+    const setPageTextItems = useCallback((pageNumber: number, items: any[]) => {
+      setPageTextItemsState(prev => ({ ...prev, [pageNumber]: items }));
+    }, []);
+
+    useEffect(() => {
+        if (Object.keys(pageTextItems).length > 0 && activeDoc) {
+          const allTextItems = Object.entries(pageTextItems)
+            .sort(([a], [b]) => parseInt(a) - parseInt(b))
+            .flatMap(([pageNumber, items]) => items.map(item => ({ ...item, pageNumber: parseInt(pageNumber) })));
+    
+          const fullText = allTextItems.map(item => item.str).join('');
+          const sentenceRegex = /[^.!?]+[.!?]+/g;
+          const matches = [...fullText.matchAll(sentenceRegex)];
+    
+          let charIndex = 0;
+          const parsedSentences: Sentence[] = matches.map(match => {
+            const sentenceText = match[0].trim();
+            const startChar = match.index;
+            const endChar = startChar + sentenceText.length;
+    
+            const sentenceItems = [];
+            let currentItemIndex = allTextItems.findIndex(item => charIndex >= item.runningIndex && charIndex < item.runningIndex + item.str.length);
+            if (currentItemIndex === -1) currentItemIndex = 0;
+    
+            let tempCharIndex = charIndex;
+    
+            while (tempCharIndex < endChar && currentItemIndex < allTextItems.length) {
+              const item = allTextItems[currentItemIndex];
+              const itemStart = item.runningIndex;
+              const itemEnd = itemStart + item.str.length;
+    
+              if (Math.max(itemStart, startChar) < Math.min(itemEnd, endChar)) {
+                 const [_, __, ___, ____, x, y] = item.transform;
+                 sentenceItems.push({
+                   x: x,
+                   y: y,
+                   width: item.width,
+                   height: item.height,
+                   text: item.str,
+                   pageNumber: item.pageNumber,
+                 });
+              }
+              tempCharIndex = itemEnd;
+              currentItemIndex++;
+            }
+            charIndex = endChar;
+            
+            return {
+              text: sentenceText,
+              pageNumber: sentenceItems.length > 0 ? sentenceItems[0].pageNumber : 0,
+              items: sentenceItems,
+              startChar: startChar,
+              endChar: endChar,
+            };
+          }).filter(s => s.items.length > 0);
+          
+          let runningIndex = 0;
+            allTextItems.forEach(item => {
+                item.runningIndex = runningIndex;
+                runningIndex += item.str.length;
+            });
+          setSentences(parsedSentences);
+        }
+    }, [pageTextItems, activeDoc]);
+
+    useEffect(() => {
+      if (isSpeaking && audioDuration > 0 && sentences.length > 0 && documentText.length > 0) {
+        const textProgress = (audioCurrentTime / audioDuration) * documentText.length;
+        const currentSentence = sentences.find(s => textProgress >= s.startChar && textProgress < s.endChar);
+        if (currentSentence && currentSentence.text !== highlightedSentence?.text) {
+          setHighlightedSentence(currentSentence);
+        }
+      } else if (!isSpeaking) {
+        setHighlightedSentence(null);
+      }
+    }, [audioCurrentTime, audioDuration, isSpeaking, sentences, documentText, highlightedSentence]);
+
     const fetchUserDocuments = useCallback(async () => {
         try {
           const docs = await getDocuments();
@@ -103,7 +201,6 @@ export function useReadPage() {
         }
         fetchVoices();
         
-        // Cleanup poller on unmount
         return () => {
             if (pollerRef.current) clearInterval(pollerRef.current);
             if (localAudioUrlRef.current) {
@@ -113,12 +210,10 @@ export function useReadPage() {
 
     }, []);
 
-    // Effect to handle auto-play when a new audioUrl appears
     useEffect(() => {
         const sourceUrl = localAudioUrl || activeDoc?.audioUrl;
         if (audioRef.current && sourceUrl) {
             const currentSrc = audioRef.current.src;
-            // Only update and play if the source is new and valid
             if (sourceUrl && currentSrc !== sourceUrl) {
                 audioRef.current.src = sourceUrl;
                 audioRef.current.load();
@@ -150,7 +245,7 @@ export function useReadPage() {
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.src = "";
-            audioRef.current.removeAttribute('src'); // Fully clear the source
+            audioRef.current.removeAttribute('src');
         }
         if (localAudioUrlRef.current) {
           URL.revokeObjectURL(localAudioUrlRef.current);
@@ -162,27 +257,22 @@ export function useReadPage() {
         setAudioProgress(0);
         setGenerationState('idle');
         if (pollerRef.current) clearInterval(pollerRef.current);
+        setPageTextItemsState({});
+        setSentences([]);
+        setHighlightedSentence(null);
     };
 
     const handleUploadNewDocumentClick = () => {
         clearActiveDoc();
-        // Clicks the hidden file input. If the user is on the TTS tab, this
-        // will just bring them back to the PDF upload view.
         if (!activeDoc) {
              fileInputRef.current?.click();
         }
     };
     
     const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
-      if (generationState !== 'idle') {
-          return;
-      }
-      if (!doc.textContent || !doc.id) {
-          return;
-      }
-      if (doc.audioUrl) {
-          return; // Audio already exists
-      }
+      if (generationState !== 'idle') return;
+      if (!doc.textContent || !doc.id) return;
+      if (doc.audioUrl) return;
   
       setGenerationState('generating');
       toast({ title: "Generating Audio", description: "This may take a few moments..." });
@@ -208,7 +298,6 @@ export function useReadPage() {
                       
                       const updatedDoc = await saveDocument({ id: doc.id!, audioUrl: status.audioUrl });
                       
-                      // This is a critical fix. We must update the state directly.
                       setActiveDoc(updatedDoc); 
                       await fetchUserDocuments();
                       setGenerationState('idle');
@@ -243,8 +332,8 @@ export function useReadPage() {
           
           if (newAudioUrl) {
               const updatedDoc = await saveDocument({ id: doc.id, audioUrl: newAudioUrl });
-              setActiveDoc(updatedDoc); // Directly update the active doc
-              await fetchUserDocuments(); // Refresh the list in the background
+              setActiveDoc(updatedDoc);
+              await fetchUserDocuments();
               setGenerationState('idle');
               toast({ title: "Success", description: "Audio generated and saved." });
           }
@@ -279,7 +368,6 @@ export function useReadPage() {
         audioRef.current.src = doc.audioUrl;
         audioRef.current.load();
     } else if (doc.textContent) {
-        // If there's text but no audio, start generation immediately
         handleGenerateAudioForDoc(doc);
     }
 }, [handleGenerateAudioForDoc]);
@@ -368,7 +456,7 @@ export function useReadPage() {
         }
         const newLocalUrl = URL.createObjectURL(mergedAudioBlob);
         localAudioUrlRef.current = newLocalUrl;
-        setLocalAudioUrl(newLocalUrl); // This will trigger the useEffect for playback
+        setLocalAudioUrl(newLocalUrl);
         return { success: true, audioUrl: newLocalUrl };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -572,6 +660,6 @@ export function useReadPage() {
         handlePlayPause, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
         getProcessingMessage, handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
-        isAudioGenerationRunning
+        isAudioGenerationRunning, setPageTextItems, highlightedSentence
     };
 }
