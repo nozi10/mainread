@@ -16,8 +16,7 @@ import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
 import { cleanPdfText } from '@/ai/flows/clean-text-flow';
 import { generateSpeech } from '@/ai/flows/generate-speech';
 import { mergeAudio } from '@/lib/audio-utils';
-import { startAmazonVoiceGeneration, checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
-import { generateAmazonVoiceSync } from '@/ai/flows/speech-generation/amazon-sync';
+import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
 
 type GenerationState = 'idle' | 'generating' | 'polling' | 'error';
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
@@ -86,62 +85,49 @@ export function useReadPage() {
 
     useEffect(() => {
         if (Object.keys(pageTextItems).length > 0 && activeDoc) {
-          const allTextItems = Object.entries(pageTextItems)
-            .sort(([a], [b]) => parseInt(a) - parseInt(b))
-            .flatMap(([pageNumber, items]) => items.map(item => ({ ...item, pageNumber: parseInt(pageNumber) })));
-    
-          const fullText = allTextItems.map(item => item.str).join('');
-          const sentenceRegex = /[^.!?]+[.!?]+/g;
-          const matches = [...fullText.matchAll(sentenceRegex)];
-    
-          let charIndex = 0;
-          const parsedSentences: Sentence[] = matches.map(match => {
-            const sentenceText = match[0].trim();
-            const startChar = match.index;
-            const endChar = startChar + sentenceText.length;
-    
-            const sentenceItems = [];
-            let currentItemIndex = allTextItems.findIndex(item => charIndex >= item.runningIndex && charIndex < item.runningIndex + item.str.length);
-            if (currentItemIndex === -1) currentItemIndex = 0;
-    
-            let tempCharIndex = charIndex;
-    
-            while (tempCharIndex < endChar && currentItemIndex < allTextItems.length) {
-              const item = allTextItems[currentItemIndex];
-              const itemStart = item.runningIndex;
-              const itemEnd = itemStart + item.str.length;
-    
-              if (Math.max(itemStart, startChar) < Math.min(itemEnd, endChar)) {
-                 const [_, __, ___, ____, x, y] = item.transform;
-                 sentenceItems.push({
-                   x: x,
-                   y: y,
-                   width: item.width,
-                   height: item.height,
-                   text: item.str,
-                   pageNumber: item.pageNumber,
-                 });
-              }
-              tempCharIndex = itemEnd;
-              currentItemIndex++;
+            let allText = '';
+            const allItemsWithPage = Object.entries(pageTextItems).flatMap(([pageNum, items]) => 
+                items.map(item => {
+                    const [_, __, ___, ____, x, y] = item.transform;
+                    return { ...item, pageNumber: parseInt(pageNum, 10), x, y, startChar: allText.length, endChar: allText.length + item.str.length };
+                })
+            );
+
+            allText = allItemsWithPage.map(item => item.str).join('');
+
+            const sentenceRegex = /[^.!?]+(?:[.!?]|\s|$)/g;
+            let match;
+            const parsedSentences: Sentence[] = [];
+
+            while ((match = sentenceRegex.exec(allText)) !== null) {
+                const sentenceText = match[0].trim();
+                if (sentenceText.length === 0) continue;
+
+                const startChar = match.index;
+                const endChar = startChar + sentenceText.length;
+                
+                const sentenceItems = allItemsWithPage.filter(item => 
+                    item.startChar < endChar && item.endChar > startChar
+                );
+
+                if (sentenceItems.length > 0) {
+                    parsedSentences.push({
+                        text: sentenceText,
+                        pageNumber: sentenceItems[0].pageNumber,
+                        items: sentenceItems.map(item => ({
+                            x: item.x,
+                            y: item.y,
+                            width: item.width,
+                            height: item.height,
+                            text: item.str,
+                            pageNumber: item.pageNumber,
+                        })),
+                        startChar: startChar,
+                        endChar: endChar,
+                    });
+                }
             }
-            charIndex = endChar;
-            
-            return {
-              text: sentenceText,
-              pageNumber: sentenceItems.length > 0 ? sentenceItems[0].pageNumber : 0,
-              items: sentenceItems,
-              startChar: startChar,
-              endChar: endChar,
-            };
-          }).filter(s => s.items.length > 0);
-          
-          let runningIndex = 0;
-            allTextItems.forEach(item => {
-                item.runningIndex = runningIndex;
-                runningIndex += item.str.length;
-            });
-          setSentences(parsedSentences);
+            setSentences(parsedSentences);
         }
     }, [pageTextItems, activeDoc]);
 

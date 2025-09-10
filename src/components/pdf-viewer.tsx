@@ -26,7 +26,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const { toast } = useToast();
-  const highlightRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pageRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -49,13 +49,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 
   useEffect(() => {
     if (highlightedSentence) {
-      const firstItem = highlightedSentence.items[0];
-      if (firstItem) {
-        const highlightId = `highlight-${firstItem.pageNumber}-${firstItem.text.slice(0, 10)}`;
-        const element = highlightRefs.current[highlightId];
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+      const pageElement = pageRefs.current[highlightedSentence.pageNumber];
+      if (pageElement) {
+        pageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
   }, [highlightedSentence]);
@@ -64,26 +60,44 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
     if (!highlightedSentence || highlightedSentence.pageNumber !== pageNumber) {
       return null;
     }
-
-    return highlightedSentence.items.map((item, index) => {
-      const highlightId = `highlight-${pageNumber}-${item.text.slice(0, 10)}`;
-      return (
-        <div
-          key={index}
-          ref={(el) => (highlightRefs.current[highlightId] = el)}
-          style={{
-            position: 'absolute',
-            left: `${item.x}px`,
-            top: `${item.y}px`,
-            width: `${item.width}px`,
-            height: `${item.height}px`,
-            backgroundColor: 'rgba(255, 255, 0, 0.4)',
-            zIndex: 10,
-            pointerEvents: 'none',
-          }}
-        />
-      );
+  
+    // Combine adjacent items into a single highlight box for better visuals
+    const combinedItems: { x: number, y: number, width: number, height: number }[] = [];
+    let currentLine: { x: number, y: number, width: number, height: number, endX: number } | null = null;
+  
+    highlightedSentence.items.forEach(item => {
+      if (currentLine && Math.abs(currentLine.y - (item.y * zoomLevel)) < 5) { // Same line
+        currentLine.width += item.width * zoomLevel;
+        currentLine.endX += item.width * zoomLevel;
+      } else {
+        if (currentLine) combinedItems.push(currentLine);
+        currentLine = {
+          x: item.x * zoomLevel,
+          y: item.y * zoomLevel,
+          width: item.width * zoomLevel,
+          height: item.height * zoomLevel,
+          endX: (item.x + item.width) * zoomLevel
+        };
+      }
     });
+    if (currentLine) combinedItems.push(currentLine);
+  
+    return combinedItems.map((item, index) => (
+      <div
+        key={index}
+        style={{
+          position: 'absolute',
+          left: `${item.x}px`,
+          top: `${item.y}px`,
+          width: `${item.width}px`,
+          height: `${item.height}px`,
+          backgroundColor: 'hsla(var(--primary) / 0.3)',
+          zIndex: 10,
+          pointerEvents: 'none',
+          borderRadius: '2px',
+        }}
+      />
+    ));
   };
 
   return (
@@ -102,7 +116,11 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
           className="flex flex-col items-center"
         >
           {numPages && Array.from(new Array(numPages), (el, index) => (
-            <div key={`page_${index + 1}`} className="my-2 shadow-lg relative">
+            <div 
+              key={`page_container_${index + 1}`} 
+              ref={(el) => pageRefs.current[index + 1] = el}
+              className="my-2 shadow-lg relative"
+            >
               <Page
                 pageNumber={index + 1}
                 scale={zoomLevel}
