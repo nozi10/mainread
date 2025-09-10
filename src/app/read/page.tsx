@@ -10,93 +10,117 @@ import UserPanel from '@/components/user-panel';
 import AudioPlayer from '@/components/audio-player';
 import AiDialog from '@/components/ai-dialog';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { BarChart, BookOpenCheck, BrainCircuit, Lightbulb, MessageSquare, UploadCloud } from 'lucide-react';
+import { BarChart, BookOpenCheck, BrainCircuit, Lightbulb, MessageSquare, UploadCloud, Menu } from 'lucide-react';
 import { SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import AudioSettingsPanel from '@/components/audio-settings-panel';
 import DocumentLibrary from '@/components/document-library';
 import MainContent from '@/components/main-content';
 import { ChatWindow } from '@/components/chat-window';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useMediaQuery } from '@/hooks/use-media-query';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 
 export default function ReadPage() {
   const state = useReadPage();
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+  const SidebarContentItems = () => (
+    <>
+      <SidebarHeader>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-headline text-primary flex items-center gap-2"><BarChart /> Readify</h1>
+          <ThemeToggle />
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarMenuItem>
+          <SidebarMenuButton onClick={state.handleUploadNewDocumentClick}>
+            <UploadCloud />
+            Upload New Document
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        
+        <Separator className="my-2" />
+
+        <AudioSettingsPanel
+          availableVoices={state.availableVoices}
+          selectedVoice={state.selectedVoice}
+          onSelectedVoiceChange={state.setSelectedVoice}
+          speakingRate={state.speakingRate}
+          onSpeakingRateChange={state.setSpeakingRate}
+          isAudioGenerating={state.isAudioGenerationRunning}
+          isSpeaking={state.isSpeaking}
+          onPreviewVoice={state.handlePreviewVoice}
+        />
+        
+        <Separator className="my-2" />
+
+        <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => state.handleAiAction('summary')} disabled={!state.documentText}>
+                <Lightbulb />
+                Summarize & Key Points
+            </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+        <SidebarMenuButton onClick={() => state.handleAiAction('glossary')} disabled={!state.documentText}>
+            <BookOpenCheck />
+            Create Glossary
+        </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => state.handleAiAction('quiz')} disabled={!state.documentText}>
+                <BrainCircuit />
+                {state.activeDoc?.quizAttempt ? 'Review Quiz' : 'Generate Quiz'}
+            </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+        <SidebarMenuButton onClick={() => state.setIsChatOpen(true)} disabled={!state.documentText}>
+            <MessageSquare />
+            Chat with Document
+        </SidebarMenuButton>
+        </SidebarMenuItem>
+        
+        <Separator className="my-2" />
+
+        <DocumentLibrary
+          documents={state.userDocuments}
+          activeDocId={state.activeDoc?.id || null}
+          onSelect={state.handleSelectDocument}
+          onDelete={state.handleDeleteDocument}
+          onGenerateAudio={state.handleGenerateAudio}
+          isAudioGenerating={state.isAudioGenerationRunning}
+          onUploadNew={state.handleUploadNewDocumentClick}
+        />
+        
+      </SidebarContent>
+      <SidebarFooter>
+        {state.session && <UserPanel session={state.session} onLogout={state.handleLogout} onUpdate={state.fetchSession} />}
+      </SidebarFooter>
+    </>
+  );
 
   return (
     <TooltipProvider>
       <div className={cn("flex h-screen w-full bg-background", state.isFullScreen && "fixed inset-0 z-50")}>
-        <Sidebar className={cn(state.isFullScreen && "hidden")}>
-          <SidebarHeader>
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-headline text-primary flex items-center gap-2"><BarChart /> Readify</h1>
-              <ThemeToggle />
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={state.handleUploadNewDocumentClick}>
-                <UploadCloud />
-                Upload New Document
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            
-            <Separator className="my-2" />
-
-            <AudioSettingsPanel
-              availableVoices={state.availableVoices}
-              selectedVoice={state.selectedVoice}
-              onSelectedVoiceChange={state.setSelectedVoice}
-              speakingRate={state.speakingRate}
-              onSpeakingRateChange={state.setSpeakingRate}
-              isAudioGenerating={state.isAudioGenerationRunning}
-              isSpeaking={state.isSpeaking}
-              onPreviewVoice={state.handlePreviewVoice}
-            />
-            
-            <Separator className="my-2" />
-
-            <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => state.handleAiAction('summary')} disabled={!state.documentText}>
-                    <Lightbulb />
-                    Summarize & Key Points
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => state.handleAiAction('glossary')} disabled={!state.documentText}>
-                <BookOpenCheck />
-                Create Glossary
-            </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => state.handleAiAction('quiz')} disabled={!state.documentText}>
-                    <BrainCircuit />
-                    {state.activeDoc?.quizAttempt ? 'Review Quiz' : 'Generate Quiz'}
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => state.setIsChatOpen(true)} disabled={!state.documentText}>
-                <MessageSquare />
-                Chat with Document
-            </SidebarMenuButton>
-            </SidebarMenuItem>
-            
-            <Separator className="my-2" />
-
-            <DocumentLibrary
-              documents={state.userDocuments}
-              activeDocId={state.activeDoc?.id || null}
-              onSelect={state.handleSelectDocument}
-              onDelete={state.handleDeleteDocument}
-              onGenerateAudio={state.handleGenerateAudio}
-              isAudioGenerating={state.isAudioGenerationRunning}
-              onUploadNew={state.handleUploadNewDocumentClick}
-            />
-            
-          </SidebarContent>
-          <SidebarFooter>
-            {state.session && <UserPanel session={state.session} onLogout={state.handleLogout} onUpdate={state.fetchSession} />}
-          </SidebarFooter>
-        </Sidebar>
+        {isDesktop ? (
+          <Sidebar className={cn(state.isFullScreen && "hidden")}>
+             <SidebarContentItems />
+          </Sidebar>
+        ) : (
+          <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+            <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="absolute top-2 left-2 z-20">
+                    <Menu />
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0 flex flex-col">
+              <SidebarContentItems />
+            </SheetContent>
+          </Sheet>
+        )}
         
         <div className="flex-1 flex flex-col relative bg-muted/30">
           <main className="flex-1 flex items-center justify-center overflow-auto">

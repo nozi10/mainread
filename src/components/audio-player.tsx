@@ -9,11 +9,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Slider } from './ui/slider';
 import { Separator } from './ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 
 type AudioPlayerProps = {
   isSpeaking: boolean;
-  processingStage: 'idle' | 'generating' | 'error';
+  processingStage: 'idle' | 'generating' | 'polling' | 'error';
   processingMessage: string;
   onPlayPause: () => void;
   canPlay: boolean;
@@ -78,13 +79,37 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 }) => {
   const isGeneratingSpeech = processingStage !== 'idle' && processingStage !== 'error';
   const hasAudio = duration > 0;
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  
+  const handleDownload = async () => {
+    if (!showDownload || !downloadUrl) return;
+    try {
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error('Network response was not ok.');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = downloadFileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback for browsers that might block this, or for CORS issues
+      window.open(downloadUrl, '_blank');
+    }
+  };
+
 
   return (
     <div className="p-2 md:p-4 w-full">
       <Card className="max-w-3xl mx-auto p-4 shadow-2xl bg-card/90 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
             {/* Audio Controls */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={onRewind} disabled={!hasAudio}>
@@ -133,10 +158,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 </div>
             </div>
             
-            <Separator orientation="vertical" className="h-10" />
+            {isDesktop && <Separator orientation="vertical" className="h-10" />}
 
             {/* PDF Controls */}
-            <div className="flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-1">
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={onZoomOut} disabled={!isPdfLoaded || zoomLevel <= 0.4}>
@@ -180,9 +205,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     <DropdownMenuTrigger asChild>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="sm" className="w-20" disabled={!hasAudio}>
-                                <Wind className="mr-2 h-4 w-4" />
-                                {playbackRate.toFixed(2)}x
+                            <Button variant="ghost" size={isDesktop ? 'sm' : 'icon'} className={isDesktop ? 'w-20' : ''} disabled={!hasAudio}>
+                                <Wind className={isDesktop ? 'mr-2 h-4 w-4' : 'h-5 w-5'} />
+                                {isDesktop && `${playbackRate.toFixed(2)}x`}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Playback Speed</p></TooltipContent>
@@ -196,16 +221,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                     ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
-                <a href={showDownload ? downloadUrl : undefined} download={showDownload ? downloadFileName : undefined}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={!showDownload}>
-                                <Download className="h-5 w-5"/>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Download Audio</p></TooltipContent>
-                    </Tooltip>
-                </a>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={!showDownload} onClick={handleDownload}>
+                            <Download className="h-5 w-5"/>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Download Audio</p></TooltipContent>
+                </Tooltip>
             </div>
         </div>
       </Card>
