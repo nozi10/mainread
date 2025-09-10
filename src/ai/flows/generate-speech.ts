@@ -15,6 +15,7 @@ import { formatTextForSpeech } from './format-text-for-speech';
 import { generateOpenAIVoice } from './speech-generation/openai';
 import { generateLemonfoxVoice } from './speech-generation/lemonfox';
 import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
+import { generateAmazonVoiceSync } from './speech-generation/amazon-sync';
 
 
 // This function can be directly called from client components as a Server Action.
@@ -44,11 +45,16 @@ export async function generateSpeech(
                 audioDataUris = await generateLemonfoxVoice(formattedText, voiceName, speakingRate);
                 break;
             case 'amazon':
-                if (!input.docId) {
-                    throw new Error('docId is required for Amazon Polly generation.');
+                // If a docId is present, we are generating audio for a full document
+                // and should use the asynchronous, S3-saving method.
+                if (input.docId) {
+                    const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId);
+                    pollyTaskId = taskId;
+                } else {
+                    // Otherwise, it's a short, on-the-fly request (e.g., chat, TTS tab),
+                    // so we use the synchronous method that returns a data URI directly.
+                    audioDataUris = await generateAmazonVoiceSync(formattedText, voiceName, speakingRate);
                 }
-                const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId);
-                pollyTaskId = taskId;
                 break;
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);
