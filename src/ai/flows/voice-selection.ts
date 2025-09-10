@@ -1,6 +1,3 @@
-
-'use server';
-
 /**
  * @fileOverview Implements a Genkit flow for voice selection in a text-to-speech application.
  *
