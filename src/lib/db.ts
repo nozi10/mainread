@@ -30,6 +30,7 @@ export interface Document {
   pdfUrl: string;
   textContent: string; // Add this field to store cleaned text
   audioUrl: string | null;
+  audioGenerationTaskId?: string | null; // To track async Polly tasks
   speechMarks?: SpeechMark[] | null;
   zoomLevel: number;
   createdAt: string;

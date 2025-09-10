@@ -67,7 +67,7 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
 }
 
 // Helper to parse speech mark JSON lines
-function parseSpeechMarks(jsonLines: string): SpeechMark[] {
+export function parseSpeechMarks(jsonLines: string): SpeechMark[] {
     if (!jsonLines) return [];
     const lines = jsonLines.trim().split('\n');
     return lines.map(line => {

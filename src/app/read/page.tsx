@@ -32,6 +32,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { SpeechMark } from '@/ai/schemas';
 import UserPanel from '@/components/user-panel';
 import dynamic from 'next/dynamic';
+import { startAmazonVoiceGeneration, checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
 
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), { 
   ssr: false,
@@ -43,7 +44,7 @@ const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), {
   )
 });
 
-type GenerationState = 'idle' | 'generating' | 'error';
+type GenerationState = 'idle' | 'generating' | 'polling' | 'error';
 type ActiveDocument = Document;
 
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
@@ -117,6 +118,8 @@ export default function ReadPage() {
   const router = useRouter();
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
 
   const fetchSession = useCallback(async () => {
     const sessionData = await getUserSession();
@@ -138,6 +141,13 @@ export default function ReadPage() {
     try {
       const docs = await getDocuments();
       setUserDocuments(docs);
+       // If there's an active document, update its state from the fetched list
+      if (activeDoc) {
+        const updatedActiveDoc = docs.find(d => d.id === activeDoc.id);
+        if (updatedActiveDoc) {
+            setActiveDoc(updatedActiveDoc);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch documents', error);
       toast({
@@ -146,7 +156,7 @@ export default function ReadPage() {
         description: "Could not load your documents.",
       });
     }
-  }, [toast]);
+  }, [toast, activeDoc]);
 
   useEffect(() => {
     fetchUserDocuments();
@@ -163,15 +173,20 @@ export default function ReadPage() {
       }
     }
     fetchVoices();
+  }, []); // Note: fetchUserDocuments removed from dependency array to avoid loops on activeDoc change. It's called strategically instead.
 
-     // Cleanup blob URL on unmount
+
+  useEffect(() => {
+    // Cleanup blob URL on unmount
     return () => {
       if (localAudioUrlRef.current) {
         URL.revokeObjectURL(localAudioUrlRef.current);
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     };
-
-  }, [toast, fetchUserDocuments]);
+  }, []);
 
 
   const handleLogout = async () => {
@@ -195,6 +210,10 @@ export default function ReadPage() {
     setAudioDuration(0);
     setAudioCurrentTime(0);
     setAudioProgress(0);
+    setGenerationState('idle');
+    if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+    }
   }
 
   const handleUploadNewDocumentClick = () => {
@@ -211,10 +230,12 @@ export default function ReadPage() {
     setPdfZoomLevel(doc.zoomLevel);
     setSpeechMarks(doc.speechMarks || []);
     
-    // Fetch text if it's not already loaded or empty
+    if (doc.audioGenerationTaskId) {
+        setGenerationState('polling');
+        startPolling(doc.id, doc.audioGenerationTaskId);
+    }
+
     if (!doc.textContent) {
-      // In a real app, you might fetch this on demand if it's large
-      // For now, we assume textContent is always saved with the doc
       console.log("Document text is missing, AI tools will be limited.");
       setDocumentText("");
     } else {
@@ -242,7 +263,7 @@ export default function ReadPage() {
   };
   
   const handleGenerateAudio = async () => {
-      if (generationState === 'generating') {
+      if (generationState === 'generating' || generationState === 'polling') {
           toast({ title: "In Progress", description: "Audio generation is already running." });
           return;
       }
@@ -252,9 +273,19 @@ export default function ReadPage() {
           return;
       }
       
+      const [provider] = selectedVoice.split('/');
+
+      if (provider === 'amazon') {
+        await handleGenerateAmazonAudio();
+      } else {
+        await handleGenerateOpenAIAudio();
+      }
+  }
+
+  const handleGenerateOpenAIAudio = async () => {
+      if (!activeDoc?.id) return;
       setGenerationState('generating');
       toast({ title: "Starting Audio Generation", description: "This may take a few moments..." });
-
       try {
         const result = await generateSpeech({
             text: documentText,
@@ -297,16 +328,67 @@ export default function ReadPage() {
             audioRef.current.load();
         }
         await fetchUserDocuments();
-
         toast({ title: "Success", description: "Audio generated and saved." });
-
       } catch (error: any) {
-        console.error('Speech generation error', error);
+        console.error('OpenAI speech generation error', error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
         toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio. ${errorMessage}` });
       } finally {
         setGenerationState('idle');
       }
+  }
+
+  const handleGenerateAmazonAudio = async () => {
+      if (!activeDoc?.id) return;
+      setGenerationState('generating');
+      toast({ title: "Starting Long Audio Generation", description: "This process runs in the background. We'll notify you." });
+      try {
+        const [, voiceName] = selectedVoice.split('/');
+        const result = await startAmazonVoiceGeneration({
+            docId: activeDoc.id,
+            text: documentText,
+            voice: voiceName,
+        });
+        if(result.success && result.taskId) {
+            setActiveDoc(prev => prev ? { ...prev, audioGenerationTaskId: result.taskId } : null);
+            setGenerationState('polling');
+            startPolling(activeDoc.id, result.taskId);
+        } else {
+            throw new Error(result.message || 'Failed to start generation task.');
+        }
+      } catch (error) {
+        setGenerationState('error');
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        toast({ variant: "destructive", title: "Amazon TTS Error", description: message });
+      }
+  }
+
+  const startPolling = (docId: string, taskId: string) => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const statusResult = await checkAmazonVoiceGeneration({ docId, taskId });
+        if (statusResult.status === 'completed') {
+            if(pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+            setGenerationState('idle');
+            await fetchUserDocuments(); // This will refresh the activeDoc with the new audioUrl
+            toast({ title: "Audio Ready!", description: "Your long audio file is ready to play." });
+        } else if (statusResult.status === 'failed') {
+            if(pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+            setGenerationState('error');
+            toast({ variant: 'destructive', title: "Generation Failed", description: statusResult.message || "The audio generation task failed." });
+        }
+        // If 'inProgress', do nothing and let the polling continue
+      } catch (error) {
+        if(pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+        setGenerationState('error');
+        const message = error instanceof Error ? error.message : 'Polling failed';
+        toast({ variant: 'destructive', title: "Polling Error", description: message });
+      }
+    }, 10000); // Poll every 10 seconds
   };
   
   const handleDeleteDocument = async (docId: string | null) => {
@@ -556,8 +638,10 @@ export default function ReadPage() {
   }
 
   const getProcessingMessage = () => {
-      switch (generationState) {
-          case 'generating': return 'Generating and saving audio...';
+      const currentGenerationState = activeDoc?.audioGenerationTaskId ? 'polling' : generationState;
+      switch (currentGenerationState) {
+          case 'generating': return 'Starting generation...';
+          case 'polling': return 'Processing audio...';
           case 'error': return 'An error occurred during audio generation.';
           default: return '';
       }
@@ -679,6 +763,7 @@ export default function ReadPage() {
     }
   }
 
+  const isAudioGenerationRunning = activeDoc?.audioGenerationTaskId || generationState === 'generating' || generationState === 'polling';
 
   const renderContent = () => {
     if (activeDoc) {
@@ -755,7 +840,7 @@ export default function ReadPage() {
             <div className="p-2 space-y-4">
                 <div className='space-y-2'>
                     <Label>Voice</Label>
-                    <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isSpeaking || generationState === 'generating'}>
+                    <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isSpeaking || isAudioGenerationRunning}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select a voice"/>
                         </SelectTrigger>
@@ -789,7 +874,7 @@ export default function ReadPage() {
                 </div>
                 <div className='space-y-2'>
                     <Label htmlFor="speaking-rate">Speaking Rate: {speakingRate.toFixed(2)}x</Label>
-                    <Slider id="speaking-rate" min={0.25} max={4.0} step={0.25} value={[speakingRate]} onValueChange={(v) => setSpeakingRate(v[0])} disabled={isSpeaking || generationState === 'generating'} />
+                    <Slider id="speaking-rate" min={0.25} max={4.0} step={0.25} value={[speakingRate]} onValueChange={(v) => setSpeakingRate(v[0])} disabled={isSpeaking || isAudioGenerationRunning} />
                 </div>
             </div>
 
@@ -866,11 +951,11 @@ export default function ReadPage() {
                               ) : (
                                   <Tooltip>
                                       <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleGenerateAudio()} disabled={generationState === 'generating' || activeDoc?.id !== doc.id}>
-                                              {generationState === 'generating' && activeDoc?.id === doc.id ? <Loader2 className="h-4 w-4 animate-spin text-destructive" /> : <Mic className="h-4 w-4" />}
+                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleGenerateAudio()} disabled={isAudioGenerationRunning || activeDoc?.id !== doc.id}>
+                                              {isAudioGenerationRunning && activeDoc?.id === doc.id ? <Loader2 className="h-4 w-4 animate-spin text-destructive" /> : <Mic className="h-4 w-4" />}
                                           </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent><p>{generationState === 'generating' && activeDoc?.id === doc.id ? 'Generating...' : 'Generate Audio'}</p></TooltipContent>
+                                      <TooltipContent><p>{isAudioGenerationRunning && activeDoc?.id === doc.id ? 'Generating...' : 'Generate Audio'}</p></TooltipContent>
                                   </Tooltip>
                               )}
                               <Tooltip>
@@ -897,19 +982,19 @@ export default function ReadPage() {
             <main className="flex-1 flex items-center justify-center overflow-auto">
               {renderContent()}
             </main>
-            {(activeDoc || generationState !== 'idle') && (
+            {(activeDoc || isAudioGenerationRunning) && (
                 <div 
                     className="absolute inset-x-0 bottom-0 z-10"
                 >
                     <AudioPlayer
                         isSpeaking={isSpeaking}
-                        processingStage={generationState}
+                        processingStage={activeDoc?.audioGenerationTaskId ? 'polling' : generationState}
                         processingMessage={getProcessingMessage()}
                         onPlayPause={handlePlayPause}
                         canPlay={!!(activeDoc?.audioUrl)}
                         playbackRate={playbackRate}
                         onPlaybackRateChange={setPlaybackRate}
-                        showDownload={!!activeDoc?.audioUrl && generationState === 'idle'}
+                        showDownload={!!activeDoc?.audioUrl && !activeDoc?.audioUrl.includes('s3.amazonaws.com') && !isAudioGenerationRunning}
                         downloadUrl={activeDoc?.audioUrl || ''}
                         downloadFileName={`${activeDoc?.fileName?.replace(/\.pdf$/i, '') || 'audio'}.mp3`}
                         progress={audioProgress}
