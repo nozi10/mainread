@@ -78,18 +78,14 @@ export function useReadPage() {
         try {
           const docs = await getDocuments();
           setUserDocuments(docs);
+          // If there's an active document, find its updated version in the new list
           if (activeDoc) {
             const updatedActiveDoc = docs.find(d => d.id === activeDoc.id);
             if (updatedActiveDoc) {
-                // Check if a new audio URL is available and auto-play
-                if (updatedActiveDoc.audioUrl && updatedActiveDoc.audioUrl !== activeDoc.audioUrl) {
-                    if (audioRef.current) {
-                        audioRef.current.src = updatedActiveDoc.audioUrl;
-                        audioRef.current.load();
-                        audioRef.current.play().catch(e => console.error("Autoplay failed", e));
-                    }
-                }
                 setActiveDoc(updatedActiveDoc);
+            } else {
+                // The active doc was deleted, clear it
+                clearActiveDoc();
             }
           }
         } catch (error) {
@@ -122,6 +118,23 @@ export function useReadPage() {
         }
         fetchVoices();
     }, []);
+
+    // Effect to handle auto-play when a new audioUrl appears
+    useEffect(() => {
+        if (activeDoc?.audioUrl && audioRef.current) {
+            const currentSrc = audioRef.current.src;
+            // Check if the new URL is different from what's already in the player
+            if (currentSrc !== activeDoc.audioUrl) {
+                audioRef.current.src = activeDoc.audioUrl;
+                audioRef.current.load();
+                audioRef.current.play().catch(e => {
+                    console.error("Autoplay failed. User interaction may be required.", e);
+                    // Optionally, inform the user that they might need to click play manually.
+                });
+            }
+        }
+    }, [activeDoc?.audioUrl]);
+
 
     useEffect(() => {
         return () => {
@@ -217,7 +230,11 @@ export function useReadPage() {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                         setGenerationState('idle');
                         toast({ title: "Success", description: "Audio is ready and will play automatically." });
-                        await fetchUserDocuments(); // This will trigger the auto-play effect
+                        // Directly update active doc to trigger auto-play effect
+                        if (pollResult.audioUrl) {
+                            setActiveDoc(prevDoc => prevDoc ? { ...prevDoc, audioUrl: pollResult.audioUrl } : null);
+                        }
+                        await fetchUserDocuments();
                     } else if (pollResult.status === 'failed') {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                         setGenerationState('error');
@@ -251,7 +268,8 @@ export function useReadPage() {
           const audioBlobResult = await uploadAudioResponse.json();
           const newAudioUrl = audioBlobResult.url;
           
-          await saveDocument({ id: activeDoc.id, audioUrl: newAudioUrl });
+          const updatedDoc = await saveDocument({ id: activeDoc.id, audioUrl: newAudioUrl });
+          setActiveDoc(updatedDoc); // This will trigger the auto-play effect
           await fetchUserDocuments(); 
 
           toast({ title: "Success", description: "Audio generated and will play automatically." });
