@@ -203,20 +203,20 @@ export async function deleteDocument(docId: string): Promise<{ success: boolean,
         if (doc.audioUrl) {
             if (doc.audioUrl.includes('public.blob.vercel-storage.com')) {
                 await deleteBlob(doc.audioUrl);
-            } else if (doc.audioUrl.includes('.s3.')) {
+            } else if (doc.audioUrl.includes('s3.amazonaws.com')) {
                 // This is an S3 URL, so we delete it from the S3 bucket
                 try {
                     const url = new URL(doc.audioUrl);
-                    const bucket = url.hostname.split('.')[0];
-                    const key = url.pathname.substring(1); // remove leading '/'
+                    const bucketName = url.hostname.split('.')[0];
+                    const objectKey = url.pathname.substring(1); // remove leading '/'
                     
                     const command = new DeleteObjectCommand({
-                        Bucket: bucket,
-                        Key: decodeURIComponent(key),
+                        Bucket: bucketName,
+                        Key: decodeURIComponent(objectKey),
                     });
                     
                     await s3Client.send(command);
-                    console.log(`Successfully deleted ${key} from S3 bucket ${bucket}.`);
+                    console.log(`Successfully deleted ${objectKey} from S3 bucket ${bucketName}.`);
 
                 } catch (s3Error) {
                     console.error("Failed to delete object from S3, it may have already been removed:", s3Error);
