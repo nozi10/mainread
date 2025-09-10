@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect, forwardRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
-import { Loader2, Minus, Send, X, Volume2, Trash2 } from 'lucide-react';
+import { Loader2, Minus, Send, X, Volume2, Trash2, Pause } from 'lucide-react';
 import { type ChatMessage } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import { DraggableCore } from 'react-draggable';
@@ -29,11 +29,12 @@ type ChatWindowProps = {
   onClose: () => void;
   onPlayAudio: (text: string) => void;
   onClearChat: () => void;
+  isPlaying: boolean;
 };
 
 // Use forwardRef to get a ref to the underlying DOM element for react-draggable
 export const ChatWindow = forwardRef<HTMLDivElement, ChatWindowProps>(
-    ({ chatHistory, isLoading, onSendMessage, onClose, onPlayAudio, onClearChat }, ref) => {
+    ({ chatHistory, isLoading, onSendMessage, onClose, onPlayAudio, onClearChat, isPlaying }, ref) => {
   const [message, setMessage] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -116,7 +117,7 @@ export const ChatWindow = forwardRef<HTMLDivElement, ChatWindowProps>(
                            </div>
                            {chat.role === 'assistant' && (
                                <Button variant="ghost" size="icon" className="h-6 w-6 mt-2" onClick={() => onPlayAudio(chat.content)}>
-                                   <Volume2 className="h-4 w-4" />
+                                   {isPlaying ? <Pause className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                                </Button>
                            )}
                         </div>
@@ -155,5 +156,3 @@ export const ChatWindow = forwardRef<HTMLDivElement, ChatWindowProps>(
   );
 });
 ChatWindow.displayName = "ChatWindow";
-
-    

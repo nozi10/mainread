@@ -49,6 +49,7 @@ export function useReadPage() {
     const [pdfZoomLevel, setPdfZoomLevel] = useState(1);
     const [isSavingZoom, setIsSavingZoom] = useState(false);
     const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
+    const [isPreviewAudioPlaying, setIsPreviewAudioPlaying] = useState(false);
 
     const { toast } = useToast();
     const router = useRouter();
@@ -59,10 +60,6 @@ export function useReadPage() {
     const localAudioUrlRef = useRef<string | null>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
     
-    const setPageTextItems = useCallback((pageNumber: number, items: any[]) => {
-      // This function is now a placeholder to satisfy the PDFViewer prop.
-    }, []);
-
     const fetchUserDocuments = useCallback(async () => {
         try {
           const docs = await getDocuments();
@@ -252,26 +249,21 @@ export function useReadPage() {
       }
   }, [generationState, selectedVoice, speakingRate, toast, fetchUserDocuments]);
 
-  const handleSelectDocument = useCallback(async (doc: Document) => {
-    clearActiveDoc();
-    setActiveDoc(doc);
-    setAiSummaryOutput(null);
-    setAiQuizOutput(null);
-    setAiGlossaryOutput(null);
-    setPdfZoomLevel(doc.zoomLevel);
-    
-    if (!doc.textContent) {
-      console.log("Document text is missing, AI tools will be limited.");
-      setDocumentText("");
-    } else {
-      setDocumentText(doc.textContent);
-    }
-
-    if (doc.audioUrl && audioRef.current) {
-        audioRef.current.src = doc.audioUrl;
-        audioRef.current.load();
-    }
-}, []);
+    const handleSelectDocument = useCallback(async (doc: Document) => {
+        clearActiveDoc();
+        setActiveDoc(doc);
+        setAiSummaryOutput(null);
+        setAiQuizOutput(null);
+        setAiGlossaryOutput(null);
+        setPdfZoomLevel(doc.zoomLevel);
+        
+        if (!doc.textContent) {
+        console.log("Document text is missing, AI tools will be limited.");
+        setDocumentText("");
+        } else {
+        setDocumentText(doc.textContent);
+        }
+    }, []);
 
 
     const handlePlayPause = async () => {
@@ -318,6 +310,11 @@ export function useReadPage() {
     
     const handlePreviewVoice = async (voice: string) => {
         try {
+          if (previewAudioRef.current?.src && !previewAudioRef.current.paused) {
+            previewAudioRef.current.pause();
+            previewAudioRef.current.currentTime = 0;
+            return;
+          }
           const result = await previewSpeech({ voice: voice });
           if (result.audioDataUri && previewAudioRef.current) {
             previewAudioRef.current.src = result.audioDataUri;
@@ -330,6 +327,10 @@ export function useReadPage() {
     };
 
     const handlePlayAiResponse = async (text: string) => {
+        if (previewAudioRef.current?.src && !previewAudioRef.current.paused) {
+            previewAudioRef.current.pause();
+            return;
+        }
         try {
           const result = await generateSpeech({ text, voice: selectedVoice, speakingRate: speakingRate });
           if (!result.audioDataUris) throw new Error("No audio data returned");
@@ -338,7 +339,12 @@ export function useReadPage() {
           if (previewAudioRef.current) {
               previewAudioRef.current.src = audioUrl;
               previewAudioRef.current.play();
-              previewAudioRef.current.onended = () => URL.revokeObjectURL(audioUrl);
+              previewAudioRef.current.onended = () => {
+                  URL.revokeObjectURL(audioUrl);
+                  setIsPreviewAudioPlaying(false);
+              };
+              previewAudioRef.current.onplay = () => setIsPreviewAudioPlaying(true);
+              previewAudioRef.current.onpause = () => setIsPreviewAudioPlaying(false);
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? 'An unknown error occurred' : 'An unknown error occurred';
@@ -555,13 +561,11 @@ export function useReadPage() {
         aiSummaryOutput, setAiSummaryOutput, aiQuizOutput, setAiQuizOutput, aiGlossaryOutput, setAiGlossaryOutput, session, setSession,
         generationState, setGenerationState, isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
         isUploading, setIsUploading, isFullScreen, setIsFullScreen, pdfZoomLevel, setPdfZoomLevel, isSavingZoom, setIsSavingZoom, localAudioUrl,
-        toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef,
+        toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef, isPreviewAudioPlaying,
         fetchSession, fetchUserDocuments, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument, handleGenerateAudioForDoc,
         handlePlayPause, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
         getProcessingMessage, handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
-        isAudioGenerationRunning, setPageTextItems, highlightedSentence: null
+        isAudioGenerationRunning, highlightedSentence: null
     };
 }
-
-    

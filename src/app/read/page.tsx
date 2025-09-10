@@ -177,6 +177,7 @@ export default function ReadPage() {
             onClose={() => state.setIsChatOpen(false)}
             onPlayAudio={state.handlePlayAiResponse}
             onClearChat={state.handleClearChat}
+            isPlaying={state.isPreviewAudioPlaying}
           />
         )}
 
@@ -203,10 +204,9 @@ export default function ReadPage() {
           quizAttempt={state.activeDoc?.quizAttempt || null}
           onQuizSubmit={state.handleQuizSubmit}
           onPlayAudio={state.handlePlayAiResponse}
+          isPlaying={state.isPreviewAudioPlaying}
         />
       </div>
     </TooltipProvider>
   );
 }
-
-    

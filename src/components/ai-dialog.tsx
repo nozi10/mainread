@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Volume2 } from 'lucide-react';
+import { Loader2, Pause, Volume2 } from 'lucide-react';
 import type { SummarizePdfOutput } from '@/ai/flows/summarize-pdf';
 import type { GenerateGlossaryOutput } from '@/ai/flows/glossary-flow';
 import type { GenerateQuizOutput, QuizQuestion } from '@/ai/schemas/quiz';
@@ -37,6 +37,7 @@ type AiDialogProps = {
   quizAttempt: QuizAttempt | null;
   onQuizSubmit: (questions: QuizQuestion[], answers: Record<number, string>) => void;
   onPlayAudio: (text: string) => void;
+  isPlaying: boolean;
 };
 
 const AiDialog: React.FC<AiDialogProps> = ({
@@ -49,7 +50,8 @@ const AiDialog: React.FC<AiDialogProps> = ({
   quizOutput,
   quizAttempt,
   onQuizSubmit,
-  onPlayAudio
+  onPlayAudio,
+  isPlaying,
 }) => {
 
   const renderLoading = (text: string) => (
@@ -77,7 +79,7 @@ const AiDialog: React.FC<AiDialogProps> = ({
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold">Summary</h3>
                 <Button variant="ghost" size="icon" onClick={() => onPlayAudio(summaryOutput?.summary || '')} disabled={!summaryOutput?.summary}>
-                    <Volume2 className="h-5 w-5" />
+                    {isPlaying ? <Pause className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                 </Button>
               </div>
             {isLoading ? renderLoading('Generating summary...') : (
@@ -90,7 +92,7 @@ const AiDialog: React.FC<AiDialogProps> = ({
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold">Key Points</h3>
                 <Button variant="ghost" size="icon" onClick={() => onPlayAudio(summaryOutput?.keyPoints?.join('. ') || '')} disabled={!summaryOutput?.keyPoints}>
-                    <Volume2 className="h-5 w-5" />
+                    {isPlaying ? <Pause className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                 </Button>
             </div>
             {isLoading ? renderLoading('Extracting key points...') : (
@@ -122,7 +124,7 @@ const AiDialog: React.FC<AiDialogProps> = ({
                                 <div className="flex justify-between items-start">
                                     <p className="flex-1 pr-4">{item.definition}</p>
                                     <Button variant="ghost" size="icon" onClick={() => onPlayAudio(item.definition)} disabled={!item.definition}>
-                                        <Volume2 className="h-5 w-5" />
+                                        {isPlaying ? <Pause className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                                     </Button>
                                 </div>
                             </AccordionContent>
@@ -170,7 +172,7 @@ const AiDialog: React.FC<AiDialogProps> = ({
               <div className="flex justify-between items-center">
                 <CardTitle>Question {index + 1}</CardTitle>
                  <Button variant="ghost" size="icon" onClick={() => onPlayAudio(q.question)} disabled={!q.question}>
-                    <Volume2 className="h-5 w-5" />
+                    {isPlaying ? <Pause className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                 </Button>
               </div>
             </CardHeader>
@@ -216,7 +218,7 @@ const AiDialog: React.FC<AiDialogProps> = ({
                             <ReactMarkdown>{q.explanation}</ReactMarkdown>
                         </div>
                          <Button variant="ghost" size="icon" onClick={() => onPlayAudio(`Correct answer: ${q.answer}. ${q.explanation}`)} disabled={!q.explanation}>
-                            <Volume2 className="h-5 w-5" />
+                            {isPlaying ? <Pause className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                         </Button>
                     </div>
                  </div>
@@ -236,7 +238,7 @@ const AiDialog: React.FC<AiDialogProps> = ({
                             <CardDescription>Your Score: {quizAttempt.score.toFixed(0)}%</CardDescription>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => onPlayAudio(quizAttempt.suggestions)} disabled={!quizAttempt.suggestions}>
-                            <Volume2 className="h-5 w-5" />
+                            {isPlaying ? <Pause className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                         </Button>
                     </div>
                 </CardHeader>
