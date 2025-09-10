@@ -172,7 +172,6 @@ export function useReadPage() {
     const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
       if (generationState !== 'idle') return;
       if (!doc.textContent || !doc.id) return;
-      if (doc.audioUrl) return;
   
       setGenerationState('generating');
       toast({ title: "Generating Audio", description: "This may take a few moments..." });
@@ -312,7 +311,6 @@ export function useReadPage() {
         try {
           if (previewAudioRef.current?.src && !previewAudioRef.current.paused) {
             previewAudioRef.current.pause();
-            previewAudioRef.current.currentTime = 0;
             return;
           }
           const result = await previewSpeech({ voice: voice });

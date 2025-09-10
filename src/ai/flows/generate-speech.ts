@@ -48,7 +48,7 @@ export async function generateSpeech(
                 // If a docId is present, we are generating audio for a full document
                 // and should use the asynchronous, S3-saving method.
                 if (input.docId) {
-                    const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId);
+                    const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId, input.fileName);
                     pollyTaskId = taskId;
                 } else {
                     // Otherwise, it's a short, on-the-fly request (e.g., chat, TTS tab),

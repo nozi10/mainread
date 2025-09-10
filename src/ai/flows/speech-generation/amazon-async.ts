@@ -25,7 +25,8 @@ export async function startAmazonVoiceGeneration(
   text: string,
   voiceId: string,
   speed: number,
-  docId: string
+  docId: string,
+  fileName?: string
 ): Promise<StartGenerationResponse> {
   // Replace characters that can break SSML
   const sanitizedText = text
@@ -34,10 +35,17 @@ export async function startAmazonVoiceGeneration(
     .replace(/>/g, '&gt;');
     
   const ssmlText = `<speak><prosody rate="${Math.round(speed * 100)}%">${sanitizedText}</prosody></speak>`;
+
+  // Create a descriptive filename for S3, replacing the extension.
+  // Example: "my-report.pdf" -> "my-report.mp3"
+  const outputS3Key = fileName
+    ? fileName.replace(/\.[^/.]+$/, "") + ".mp3"
+    : `${docId}.mp3`;
   
   const command = new StartSpeechSynthesisTaskCommand({
     OutputFormat: 'mp3',
     OutputS3BucketName: S3_BUCKET_NAME,
+    OutputS3KeyPrefix: outputS3Key, // This sets the exact filename in S3.
     Text: ssmlText,
     TextType: 'ssml',
     VoiceId: voiceId,
