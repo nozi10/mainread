@@ -114,27 +114,44 @@ export function useReadPage() {
     }, []);
 
     useEffect(() => {
-        const sourceUrl = localAudioUrl || activeDoc?.audioUrl;
-        if (audioRef.current && sourceUrl) {
-            const currentSrc = audioRef.current.src;
-            if (sourceUrl && currentSrc !== sourceUrl) {
-                audioRef.current.src = sourceUrl;
-                audioRef.current.load();
-                const playPromise = audioRef.current.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(e => {
-                        console.error("Autoplay failed:", e);
-                        setIsSpeaking(false);
-                         toast({
-                            variant: "destructive",
-                            title: "Playback Error",
-                            description: "Could not auto-play audio. Please press play manually. This may be due to browser restrictions or an issue with the audio file (e.g., S3 CORS policy)."
-                        });
-                    }).then(() => setIsSpeaking(true));
+        if (!audioRef.current) return;
+
+        const handleAutoplay = async (url: string) => {
+            const playPromise = audioRef.current.play();
+            if (playPromise !== undefined) {
+                try {
+                    await playPromise;
+                    setIsSpeaking(true);
+                } catch (e) {
+                    console.error("Autoplay failed:", e);
+                    setIsSpeaking(false);
+                    toast({
+                        variant: "destructive",
+                        title: "Autoplay Blocked",
+                        description: "Could not auto-play audio due to browser restrictions. Please press play manually."
+                    });
                 }
             }
+        };
+
+        if (localAudioUrl) {
+            // Autoplay for temporary, newly generated audio
+            if (audioRef.current.src !== localAudioUrl) {
+                audioRef.current.src = localAudioUrl;
+                audioRef.current.load();
+                handleAutoplay(localAudioUrl);
+            }
+        } else if (activeDoc?.audioUrl) {
+            // Load but do NOT autoplay for existing documents
+            if (audioRef.current.src !== activeDoc.audioUrl) {
+                audioRef.current.src = activeDoc.audioUrl;
+                audioRef.current.load();
+                setIsSpeaking(false); // Ensure we start in a paused state
+            }
         }
+
     }, [activeDoc?.audioUrl, localAudioUrl, toast]);
+
 
     const handleLogout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
