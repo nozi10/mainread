@@ -195,21 +195,26 @@ export async function deleteDocument(docId: string): Promise<{ success: boolean,
         }
         
         // Delete from Vercel Blob if URL matches
-        if (doc.pdfUrl && doc.pdfUrl.includes('public.blob.vercel-storage.com')) {
+        if (doc.pdfUrl && doc.pdfUrl.includes('.blob.vercel-storage.com')) {
             await deleteBlob(doc.pdfUrl);
         }
 
         // Handle deletion from either Vercel Blob or S3 for the audio file
         if (doc.audioUrl) {
-            if (doc.audioUrl.includes('public.blob.vercel-storage.com')) {
+            if (doc.audioUrl.includes('.blob.vercel-storage.com')) {
                 await deleteBlob(doc.audioUrl);
             } else if (doc.audioUrl.includes('s3.amazonaws.com')) {
                 // This is an S3 URL, so we delete it from the S3 bucket
                 try {
                     const url = new URL(doc.audioUrl);
-                    const bucketName = url.hostname.split('.')[0];
+                    // Robustly get bucket name and key
+                    const bucketName = url.hostname.split('.s3.amazonaws.com')[0];
                     const objectKey = url.pathname.substring(1); // remove leading '/'
                     
+                    if (!bucketName || !objectKey) {
+                        throw new Error("Could not parse S3 URL for deletion.");
+                    }
+
                     const command = new DeleteObjectCommand({
                         Bucket: bucketName,
                         Key: decodeURIComponent(objectKey),

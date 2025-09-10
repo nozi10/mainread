@@ -133,11 +133,12 @@ export function useReadPage() {
                 if (playPromise !== undefined) {
                     playPromise.catch(e => {
                         console.error("Autoplay failed:", e);
+                        setIsSpeaking(false); // Ensure state is correct on failure
                         if (e.name === 'NotSupportedError') {
                             toast({
                                 variant: "destructive",
                                 title: "Playback Error",
-                                description: "The audio format from S3 might be invalid or there's a CORS issue. Please check your S3 bucket permissions and CORS configuration."
+                                description: "The audio source is invalid. This could be due to S3 permissions (CORS or public access) or a generation issue."
                             });
                         } else {
                              toast({
@@ -150,7 +151,7 @@ export function useReadPage() {
                 }
             }
         }
-    }, [activeDoc, toast]);
+    }, [activeDoc?.audioUrl, toast]);
 
 
     useEffect(() => {
@@ -224,7 +225,7 @@ export function useReadPage() {
     };
     
     const handleGenerateAudio = async () => {
-        if (generationState === 'generating' || generationState === 'polling') {
+        if (generationState !== 'idle') {
             toast({ title: "In Progress", description: "Audio generation is already running." });
             return;
         }
@@ -240,23 +241,25 @@ export function useReadPage() {
           const result = await generateSpeech({ text: documentText, voice: selectedVoice, speakingRate: speakingRate, docId: activeDoc.id });
           
           if (result.asyncTaskId) {
+            // This is the async S3 flow
             setGenerationState('polling');
             toast({ title: "Processing Audio", description: "Your audio is being generated in the background. We'll notify you when it's ready." });
             
+            // Start polling
             pollingIntervalRef.current = setInterval(async () => {
                 try {
-                    if (!activeDoc?.id) { // Check if doc is still active
+                    if (!activeDoc?.id) { // Stop polling if doc is no longer active
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                         return;
                     }
-                    const pollResult = await checkAmazonVoiceGeneration({ docId: activeDoc.id! });
+                    const pollResult = await checkAmazonVoiceGeneration({ docId: activeDoc.id });
                     if (pollResult.status === 'completed') {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                         setGenerationState('idle');
                         toast({ title: "Success", description: "Audio is ready and will play automatically." });
                         if (pollResult.audioUrl) {
-                            // This is the critical fix: directly update the active doc state
-                            setActiveDoc(prevDoc => prevDoc ? { ...prevDoc, audioUrl: pollResult.audioUrl } : null);
+                            // Fetch the latest doc data which now includes the new URL
+                            await fetchUserDocuments();
                         }
                     } else if (pollResult.status === 'failed') {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
@@ -269,14 +272,16 @@ export function useReadPage() {
                     console.error("Polling error", pollError);
                 }
             }, 5000);
-            return;
+            return; // Exit here as we are now polling
           }
 
+          // This is the synchronous flow for OpenAI/Lemonfox
           if (!result.audioDataUris || result.audioDataUris.length === 0) {
               toast({ title: "Generation Stopped", description: "Audio generation resulted in no audio." });
               setGenerationState('idle');
               return;
           }
+
           const mergedAudioBlob = await mergeAudio(result.audioDataUris);
           const audioFileName = `${activeDoc.fileName.replace(/\.pdf$/i, '') || 'audio'}.mp3`;
           
@@ -296,13 +301,14 @@ export function useReadPage() {
           await fetchUserDocuments(); 
 
           toast({ title: "Success", description: "Audio generated and will play automatically." });
+
         } catch (error: any) {
           console.error('Speech generation error', error);
           const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
           toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio. ${errorMessage}` });
           setGenerationState('error');
         } finally {
-            if (generationState === 'generating') { 
+            if (generationState === 'generating') { // Only set back to idle if we weren't polling
                 setGenerationState('idle');
             }
         }

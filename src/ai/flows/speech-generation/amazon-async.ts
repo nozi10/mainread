@@ -54,11 +54,12 @@ export async function startAmazonVoiceGeneration(
 
 async function getS3FileUrl(s3Uri: string): Promise<string> {
     const url = new URL(s3Uri);
-    const bucket = url.hostname;
+    // For virtual-hosted-style URLs (e.g., bucket.s3.region.amazonaws.com/key)
+    // or path-style URLs (e.g., s3.region.amazonaws.com/bucket/key)
+    const bucket = url.hostname.split('.')[0];
     const key = url.pathname.substring(1); // remove leading '/'
    
     // Construct the region-agnostic public URL format
-    // https://<bucket-name>.s3.amazonaws.com/<key>
     return `https://${bucket}.s3.amazonaws.com/${key}`;
 }
 
@@ -87,7 +88,8 @@ export const checkAmazonVoiceGeneration = ai.defineFlow(
     if (status === 'completed' && task?.OutputUri) {
         const finalUrl = await getS3FileUrl(task.OutputUri);
         
-        await saveDocument({ id: docId, audioUrl: finalUrl });
+        // The saveDocument and state update will now happen in the hook
+        // This flow just reports completion.
         await kv.del(`readify:polly-task:${docId}`); // Clean up
         
         return { status: 'completed', audioUrl: finalUrl };
