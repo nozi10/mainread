@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import type { Document } from '@/lib/db';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TextToSpeechTab from './text-to-speech-tab';
-import { Sentence } from '@/hooks/use-read-page';
 
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), { 
   ssr: false,
@@ -29,7 +28,6 @@ type MainContentProps = {
   fileInputRef: React.RefObject<HTMLInputElement>;
   onGenerateTextAudio: (text: string) => Promise<{ success: boolean; audioUrl?: string; error?: string }>;
   onTextExtracted: (pageNumber: number, items: any[]) => void;
-  highlightedSentence: Sentence | null;
 };
 
 export default function MainContent({
@@ -41,7 +39,6 @@ export default function MainContent({
   fileInputRef,
   onGenerateTextAudio,
   onTextExtracted,
-  highlightedSentence,
 }: MainContentProps) {
   
   const getUploadMessage = () => {
@@ -61,7 +58,6 @@ export default function MainContent({
         file={activeDoc.pdfUrl}
         zoomLevel={pdfZoomLevel}
         onTextExtracted={onTextExtracted}
-        highlightedSentence={highlightedSentence}
       />
     );
   }

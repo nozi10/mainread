@@ -21,23 +21,6 @@ import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-
 type GenerationState = 'idle' | 'generating' | 'polling' | 'error';
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
 
-export interface TextItem {
-  str: string;
-  transform: number[];
-  width: number;
-  height: number;
-  dir: string;
-}
-
-export interface Sentence {
-  text: string;
-  pageNumber: number;
-  items: { x: number; y: number; width: number; height: number; text: string; pageNumber: number; }[];
-  startChar: number;
-  endChar: number;
-}
-
-
 export function useReadPage() {
     const [activeDoc, setActiveDoc] = useState<Document | null>(null);
     const [documentText, setDocumentText] = useState('');
@@ -66,9 +49,6 @@ export function useReadPage() {
     const [pdfZoomLevel, setPdfZoomLevel] = useState(1);
     const [isSavingZoom, setIsSavingZoom] = useState(false);
     const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
-    const [pageTextItems, setPageTextItemsState] = useState<Record<number, any[]>>({});
-    const [sentences, setSentences] = useState<Sentence[]>([]);
-    const [highlightedSentence, setHighlightedSentence] = useState<Sentence | null>(null);
 
     const { toast } = useToast();
     const router = useRouter();
@@ -80,68 +60,8 @@ export function useReadPage() {
     const chatWindowRef = useRef<HTMLDivElement>(null);
     
     const setPageTextItems = useCallback((pageNumber: number, items: any[]) => {
-      setPageTextItemsState(prev => ({ ...prev, [pageNumber]: items }));
+      // This function is now a placeholder to satisfy the PDFViewer prop.
     }, []);
-
-    useEffect(() => {
-        if (Object.keys(pageTextItems).length > 0 && activeDoc) {
-            let allText = '';
-            const allItemsWithPage = Object.entries(pageTextItems).flatMap(([pageNum, items]) => 
-                items.map(item => {
-                    const [_, __, ___, ____, x, y] = item.transform;
-                    return { ...item, pageNumber: parseInt(pageNum, 10), x, y, startChar: allText.length, endChar: allText.length + item.str.length };
-                })
-            );
-
-            allText = allItemsWithPage.map(item => item.str).join('');
-
-            const sentenceRegex = /[^.!?]+(?:[.!?]|\s|$)/g;
-            let match;
-            const parsedSentences: Sentence[] = [];
-
-            while ((match = sentenceRegex.exec(allText)) !== null) {
-                const sentenceText = match[0].trim();
-                if (sentenceText.length === 0) continue;
-
-                const startChar = match.index;
-                const endChar = startChar + sentenceText.length;
-                
-                const sentenceItems = allItemsWithPage.filter(item => 
-                    item.startChar < endChar && item.endChar > startChar
-                );
-
-                if (sentenceItems.length > 0) {
-                    parsedSentences.push({
-                        text: sentenceText,
-                        pageNumber: sentenceItems[0].pageNumber,
-                        items: sentenceItems.map(item => ({
-                            x: item.x,
-                            y: item.y,
-                            width: item.width,
-                            height: item.height,
-                            text: item.str,
-                            pageNumber: item.pageNumber,
-                        })),
-                        startChar: startChar,
-                        endChar: endChar,
-                    });
-                }
-            }
-            setSentences(parsedSentences);
-        }
-    }, [pageTextItems, activeDoc]);
-
-    useEffect(() => {
-      if (isSpeaking && audioDuration > 0 && sentences.length > 0 && documentText.length > 0) {
-        const textProgress = (audioCurrentTime / audioDuration) * documentText.length;
-        const currentSentence = sentences.find(s => textProgress >= s.startChar && textProgress < s.endChar);
-        if (currentSentence && currentSentence.text !== highlightedSentence?.text) {
-          setHighlightedSentence(currentSentence);
-        }
-      } else if (!isSpeaking) {
-        setHighlightedSentence(null);
-      }
-    }, [audioCurrentTime, audioDuration, isSpeaking, sentences, documentText, highlightedSentence]);
 
     const fetchUserDocuments = useCallback(async () => {
         try {
@@ -243,9 +163,6 @@ export function useReadPage() {
         setAudioProgress(0);
         setGenerationState('idle');
         if (pollerRef.current) clearInterval(pollerRef.current);
-        setPageTextItemsState({});
-        setSentences([]);
-        setHighlightedSentence(null);
     };
 
     const handleUploadNewDocumentClick = () => {
@@ -646,6 +563,6 @@ export function useReadPage() {
         handlePlayPause, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
         getProcessingMessage, handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
-        isAudioGenerationRunning, setPageTextItems, highlightedSentence
+        isAudioGenerationRunning, setPageTextItems, highlightedSentence: null
     };
 }
