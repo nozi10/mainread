@@ -13,3 +13,4 @@ import '@/ai_flows/quiz-feedback-flow.ts';
 import '@/ai/flows/speech-generation/amazon.ts';
 import '@/ai/flows/speech-generation/amazon-async.ts';
 import '@/ai/flows/speech-generation/openai.ts';
+import '@/ai/flows/speech-generation/lemonfox.ts';
