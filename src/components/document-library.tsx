@@ -81,28 +81,28 @@ export default function DocumentLibrary({
                   </Tooltip>
                 )}
                 <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Delete document</p></TooltipContent>
-                    </Tooltip>
-                  </AlertDialogTrigger>
-                   <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete "{doc.fileName}" and its generated audio. This action cannot be undone.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => onDelete(doc.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Delete document</p></TooltipContent>
+                  </Tooltip>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete "{doc.fileName}" and its generated audio. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => onDelete(doc.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
                 </AlertDialog>
               </div>
             </div>
