@@ -1,105 +1,61 @@
 
 'use server';
 /**
- * @fileOverview Handles asynchronous, long-form text-to-speech using Amazon Polly.
- * This flow starts a synthesis task and provides a way to poll for its completion.
+ * @fileOverview Handles text-to-speech using Amazon Polly and direct S3 upload.
  */
 
-import { kv } from '@vercel/kv';
-import { pollyClient, amazonVoices, s3Client } from './amazon';
-import { StartSpeechSynthesisTaskCommand, GetSpeechSynthesisTaskCommand } from '@aws-sdk/client-polly';
-import { saveDocument, Document } from '@/lib/db';
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
+import { pollyClient, s3Client } from './amazon';
+import { SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || '';
 if (!S3_BUCKET_NAME) {
-    console.warn("AWS_S3_BUCKET_NAME is not set. Amazon Polly long-form audio will fail.");
+    console.warn("AWS_S3_BUCKET_NAME is not set. Amazon Polly audio will fail.");
 }
 
-export async function startAmazonVoiceGeneration(
+export async function generateAmazonVoice(
   text: string,
   voiceId: string,
   speed: number,
-  docId: string
-) {
-  const voiceConfig = amazonVoices.find(v => v.Id === voiceId);
-  if (!voiceConfig) {
-    throw new Error(`Amazon voice not found: ${voiceId}`);
-  }
-
+  docId: string,
+  fileName: string
+): Promise<string> {
+  
+  // Generate SSML for speed control
   const ssmlText = `<speak><prosody rate="${Math.round(speed * 100)}%">${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</prosody></speak>`;
 
-  const command = new StartSpeechSynthesisTaskCommand({
+  // 1. Synthesize Speech with Polly
+  const synthesizeCommand = new SynthesizeSpeechCommand({
     OutputFormat: 'mp3',
-    OutputS3BucketName: S3_BUCKET_NAME,
     Text: ssmlText,
     TextType: 'ssml',
     VoiceId: voiceId,
-    Engine: voiceConfig.SupportedEngines?.includes('neural') ? 'neural' : 'standard',
+    Engine: 'neural',
   });
 
-  const response = await pollyClient.send(command);
-  const taskId = response.SynthesisTask?.TaskId;
+  const { AudioStream } = await pollyClient.send(synthesizeCommand);
 
-  if (!taskId) {
-    throw new Error('Failed to start Amazon Polly synthesis task.');
+  if (!AudioStream) {
+    throw new Error('Failed to get audio stream from Amazon Polly.');
   }
-  
-  // Store the task ID associated with the document ID
-  await kv.set(`readify:polly-task:${docId}`, taskId, { ex: 3600 }); // Expire in 1 hour
 
-  return { taskId };
+  // 2. Upload the audio stream directly to S3
+  const audioBytes = await AudioStream.transformToByteArray();
+  const s3Key = `readify-audio/${docId}-${fileName.replace(/\.pdf$/i, '.mp3')}`;
+
+  const uploadCommand = new PutObjectCommand({
+    Bucket: S3_BUCKET_NAME,
+    Key: s3Key,
+    Body: audioBytes,
+    ContentType: 'audio/mpeg',
+    ACL: 'public-read', // Make the file publicly accessible
+  });
+
+  await s3Client.send(uploadCommand);
+
+  // 3. Construct and return the public URL
+  const region = process.env.AWS_REGION || 'us-east-1';
+  const audioUrl = `https://${S3_BUCKET_NAME}.s3.${region}.amazonaws.com/${s3Key}`;
+
+  return audioUrl;
 }
-
-async function getS3FileUrl(s3Uri: string): Promise<string> {
-    const url = new URL(s3Uri);
-    // For virtual-hosted-style URLs (e.g., bucket.s3.region.amazonaws.com/key)
-    // or path-style URLs (e.g., s3.region.amazonaws.com/bucket/key)
-    const bucket = url.hostname.split('.')[0];
-    const key = url.pathname.substring(1); // remove leading '/'
-   
-    // Construct the region-agnostic public URL format
-    return `https://${bucket}.s3.amazonaws.com/${key}`;
-}
-
-
-export const checkAmazonVoiceGeneration = ai.defineFlow(
-  {
-    name: 'checkAmazonVoiceGeneration',
-    inputSchema: z.object({ docId: z.string() }),
-    outputSchema: z.object({
-        status: z.enum(['in_progress', 'completed', 'failed']),
-        audioUrl: z.string().optional(),
-    }),
-  },
-  async ({ docId }) => {
-    const taskId: string | null = await kv.get(`readify:polly-task:${docId}`);
-    if (!taskId) {
-      throw new Error('No active Polly task found for this document.');
-    }
-
-    const command = new GetSpeechSynthesisTaskCommand({ TaskId: taskId });
-    const response = await pollyClient.send(command);
-    const task = response.SynthesisTask;
-    
-    const status = task?.TaskStatus;
-
-    if (status === 'completed' && task?.OutputUri) {
-        const finalUrl = await getS3FileUrl(task.OutputUri);
-        
-        // The saveDocument and state update will now happen in the hook
-        // This flow just reports completion.
-        await kv.del(`readify:polly-task:${docId}`); // Clean up
-        
-        return { status: 'completed', audioUrl: finalUrl };
-
-    } else if (status === 'inProgress' || status === 'scheduled') {
-        return { status: 'in_progress' };
-    } else {
-        console.error('Amazon Polly task failed:', task?.TaskStatusReason);
-        await kv.del(`readify:polly-task:${docId}`); // Clean up
-        return { status: 'failed' };
-    }
-  }
-);

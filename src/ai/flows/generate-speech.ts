@@ -14,7 +14,7 @@ import { GenerateSpeechInputSchema, GenerateSpeechOutputSchema, GenerateSpeechIn
 import { formatTextForSpeech } from './format-text-for-speech';
 import { generateOpenAIVoice } from './speech-generation/openai';
 import { generateLemonfoxVoice } from './speech-generation/lemonfox';
-import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
+import { generateAmazonVoice } from './speech-generation/amazon-async';
 
 
 // This function can be directly called from client components as a Server Action.
@@ -34,6 +34,7 @@ export async function generateSpeech(
         const [provider, voiceName] = input.voice.split('/');
         const speakingRate = input.speakingRate || 1.0;
         let audioDataUris: string[] = [];
+        let audioUrl: string | undefined;
 
         switch (provider) {
             case 'openai':
@@ -43,9 +44,12 @@ export async function generateSpeech(
                 audioDataUris = await generateLemonfoxVoice(formattedText, voiceName, speakingRate);
                 break;
             case 'amazon':
-                // For Amazon, we start an async job and return a taskId
-                const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId!);
-                return { asyncTaskId: taskId };
+                if (!input.docId || !input.fileName) {
+                    throw new Error('docId and fileName are required for Amazon Polly generation.');
+                }
+                // For Amazon, we do the full generation and upload process, then return the final URL
+                audioUrl = await generateAmazonVoice(formattedText, voiceName, speakingRate, input.docId, input.fileName);
+                return { audioUrl };
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);
         }
