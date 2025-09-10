@@ -5,6 +5,8 @@ import { kv } from '@vercel/kv';
 import { del as deleteBlob } from '@vercel/blob';
 import { getSession, type SessionPayload } from './session';
 import { randomUUID } from 'crypto';
+import { s3Client } from '@/ai/flows/speech-generation/amazon';
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 export interface ChatMessage {
   id: string;
@@ -191,18 +193,39 @@ export async function deleteDocument(docId: string): Promise<{ success: boolean,
         if (doc.userId !== session.userId && !session.isAdmin) {
             throw new Error('You do not have permission to delete this document.');
         }
-
-        // Only attempt to delete files from Vercel Blob storage
-        const urlsToDelete = [doc.pdfUrl];
-        if (doc.audioUrl && doc.audioUrl.includes('public.blob.vercel-storage.com')) {
-            urlsToDelete.push(doc.audioUrl);
-        }
         
-        if(urlsToDelete.length > 0) {
-            await deleteBlob(urlsToDelete);
+        // Delete from Vercel Blob if URL matches
+        if (doc.pdfUrl && doc.pdfUrl.includes('public.blob.vercel-storage.com')) {
+            await deleteBlob(doc.pdfUrl);
         }
 
-        // Delete from KV
+        // Handle deletion from either Vercel Blob or S3 for the audio file
+        if (doc.audioUrl) {
+            if (doc.audioUrl.includes('public.blob.vercel-storage.com')) {
+                await deleteBlob(doc.audioUrl);
+            } else if (doc.audioUrl.includes('.s3.')) {
+                // This is an S3 URL, so we delete it from the S3 bucket
+                try {
+                    const url = new URL(doc.audioUrl);
+                    const bucket = url.hostname.split('.')[0];
+                    const key = url.pathname.substring(1); // remove leading '/'
+                    
+                    const command = new DeleteObjectCommand({
+                        Bucket: bucket,
+                        Key: decodeURIComponent(key),
+                    });
+                    
+                    await s3Client.send(command);
+                    console.log(`Successfully deleted ${key} from S3 bucket ${bucket}.`);
+
+                } catch (s3Error) {
+                    console.error("Failed to delete object from S3, it may have already been removed:", s3Error);
+                    // We don't re-throw, as we still want to remove the DB record
+                }
+            }
+        }
+
+        // Delete from KV database
         const pipeline = kv.pipeline();
         pipeline.del(docKey);
         pipeline.lrem(`${prefix}:user:${doc.userId}:docs`, 1, docId);
