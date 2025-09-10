@@ -5,11 +5,12 @@
  * @fileOverview Implements a Genkit flow for voice selection in a text-to-speech application.
  *
  * Exports:
- *   - `getAvailableVoices`: Retrieves a list of available voices.
+ *   - `getAvailableVoices`: Retrieves a list of available voices based on admin settings.
  *   - `AvailableVoice`: The type for an available voice.
  */
 
 import {ai} from '@/ai/genkit';
+import { getVoiceProviderSettings } from '@/lib/admin-actions';
 import {z} from 'zod';
 
 const AvailableVoiceSchema = z.object({
@@ -20,7 +21,7 @@ const AvailableVoiceSchema = z.object({
 });
 export type AvailableVoice = z.infer<typeof AvailableVoiceSchema>;
 
-const availableVoices: AvailableVoice[] = [
+const allVoices: AvailableVoice[] = [
     // OpenAI
     { name: 'openai/alloy', displayName: 'Alloy', gender: 'Neutral', provider: 'openai' },
     { name: 'openai/echo', displayName: 'Echo', gender: 'Male', provider: 'openai' },
@@ -37,5 +38,26 @@ const availableVoices: AvailableVoice[] = [
 ];
 
 export async function getAvailableVoices(): Promise<AvailableVoice[]> {
-  return availableVoices;
+  try {
+    const settings = await getVoiceProviderSettings();
+    const enabledProviders = Object.keys(settings).filter(provider => settings[provider]);
+    
+    // If no settings are stored, enable all providers by default.
+    if (enabledProviders.length === 0) {
+        return allVoices;
+    }
+
+    return allVoices.filter(voice => enabledProviders.includes(voice.provider));
+  } catch (error) {
+    console.error("Failed to fetch voice provider settings, returning all voices as a fallback:", error);
+    // In case of an error (e.g., KV not available), return all voices to not break the app.
+    return allVoices;
+  }
 }
+
+export function getAllVoiceProviders(): string[] {
+    const providers = new Set(allVoices.map(v => v.provider));
+    return Array.from(providers);
+}
+
+    

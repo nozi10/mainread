@@ -7,6 +7,7 @@ import type { User as DbUser, Document as DbDocument, Submission } from './db';
 import { randomUUID } from 'crypto';
 import { deleteDocument as dbDeleteDocument } from './db';
 import { sendWelcomeEmail, sendAdminReplyEmail, sendRejectionEmail } from './email';
+import { revalidatePath } from 'next/cache';
 
 export interface Document extends DbDocument {}
 export interface AdminSubmission extends Submission {}
@@ -379,3 +380,28 @@ export async function deleteSubmission(submissionId: string): Promise<{ success:
         return { success: false, message };
     }
 }
+
+// Settings Actions
+const VOICE_SETTINGS_KEY = 'readify:settings:voice-providers';
+export type VoiceProviderSettings = Record<string, boolean>;
+
+export async function getVoiceProviderSettings(): Promise<VoiceProviderSettings> {
+    // No admin check here, so the main app can read the settings
+    const settings = await kv.get<VoiceProviderSettings>(VOICE_SETTINGS_KEY);
+    return settings || {};
+}
+
+export async function saveVoiceProviderSettings(settings: VoiceProviderSettings): Promise<{ success: boolean; message?: string }> {
+    await checkAdmin();
+    try {
+        await kv.set(VOICE_SETTINGS_KEY, settings);
+        revalidatePath('/read'); // Ensure users get updated voice list
+        return { success: true };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error('Failed to save voice provider settings:', message);
+        return { success: false, message };
+    }
+}
+
+    
