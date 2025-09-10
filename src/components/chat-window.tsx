@@ -10,6 +10,17 @@ import { type ChatMessage } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import { DraggableCore } from 'react-draggable';
 import { Textarea } from './ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 type ChatWindowProps = {
   chatHistory: ChatMessage[];
@@ -51,12 +62,6 @@ export const ChatWindow = forwardRef<HTMLDivElement, ChatWindowProps>(
     }
   };
 
-  const handleClearChat = () => {
-      if(window.confirm("Are you sure you want to permanently delete this chat history?")) {
-          onClearChat();
-      }
-  }
-
   if (isMinimized) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
@@ -79,7 +84,23 @@ export const ChatWindow = forwardRef<HTMLDivElement, ChatWindowProps>(
               <CardHeader className="handle cursor-move flex flex-row items-center justify-between p-4">
                 <CardTitle>Chat with Document</CardTitle>
                 <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClearChat}><Trash2 /></Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                             <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>Clear Chat History?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will permanently delete the chat history for this document. This action cannot be undone.
+                            </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={onClearChat}>Clear History</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMinimized(true)}><Minus /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}><X /></Button>
                 </div>
@@ -134,3 +155,5 @@ export const ChatWindow = forwardRef<HTMLDivElement, ChatWindowProps>(
   );
 });
 ChatWindow.displayName = "ChatWindow";
+
+    

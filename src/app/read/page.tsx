@@ -90,6 +90,7 @@ export default function ReadPage() {
           activeDocId={state.activeDoc?.id || null}
           onSelect={state.handleSelectDocument}
           onDelete={state.handleDeleteDocument}
+          onGenerateAudio={state.handleGenerateAudioForDoc}
           isAudioGenerating={state.isAudioGenerationRunning}
           onUploadNew={state.handleUploadNewDocumentClick}
         />
@@ -131,8 +132,7 @@ export default function ReadPage() {
               onFileChange={state.handleFileChange}
               fileInputRef={state.fileInputRef}
               onGenerateTextAudio={state.handleGenerateTextAudio}
-              onTextExtracted={state.setPageTextItems}
-              highlightedSentence={state.highlightedSentence}
+              highlightedSentence={null}
             />
           </main>
           {(state.activeDoc || state.isAudioGenerationRunning || state.localAudioUrl) && (
@@ -208,3 +208,5 @@ export default function ReadPage() {
     </TooltipProvider>
   );
 }
+
+    

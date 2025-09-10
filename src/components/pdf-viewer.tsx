@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -13,13 +13,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = `/static/pdf.worker.min.js`;
 type PdfViewerProps = {
   file: string;
   zoomLevel: number;
-  onTextExtracted: (pageNumber: number, items: any[]) => void;
+  highlightedSentence: any;
 };
 
 const PdfViewer: React.FC<PdfViewerProps> = ({ 
     file, 
     zoomLevel,
-    onTextExtracted,
+    highlightedSentence,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const { toast } = useToast();
@@ -37,13 +37,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
       description: error.message || 'Failed to load the document.',
     });
   };
-
-  const onPageRenderSuccess = useCallback(async (page: any) => {
-    const textContent = await page.getTextContent();
-    onTextExtracted(page.pageNumber, textContent.items);
-  }, [onTextExtracted]);
-
-
+  
   return (
     <div className="flex flex-col h-full w-full bg-muted">
       <div className="flex-1 overflow-auto relative flex items-start justify-center pt-4" id="pdf-viewer-container">
@@ -69,7 +63,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
                 scale={zoomLevel}
                 renderTextLayer={true}
                 renderAnnotationLayer={true}
-                onRenderSuccess={onPageRenderSuccess}
               />
             </div>
           ))}
@@ -80,3 +73,5 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 };
 
 export default PdfViewer;
+
+    

@@ -4,7 +4,8 @@
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mic, Trash2, FileText, Library, PlusCircle, Cloud } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Mic, Trash2, FileText, Library, PlusCircle, Cloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Document } from '@/lib/db';
 
@@ -13,6 +14,7 @@ type DocumentLibraryProps = {
   activeDocId: string | null;
   onSelect: (doc: Document) => void;
   onDelete: (docId: string) => void;
+  onGenerateAudio: (doc: Document) => void;
   isAudioGenerating: boolean;
   onUploadNew: () => void;
 };
@@ -22,6 +24,7 @@ export default function DocumentLibrary({
   activeDocId,
   onSelect,
   onDelete,
+  onGenerateAudio,
   isAudioGenerating,
   onUploadNew,
 }: DocumentLibraryProps) {
@@ -70,22 +73,37 @@ export default function DocumentLibrary({
                 ) : (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" disabled={true}>
-                         {/* This button is now effectively disabled as generation happens on selection */}
+                       <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isAudioGenerating} onClick={() => onGenerateAudio(doc)}>
                         <Mic className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                     <TooltipContent><p>Audio is generated on selection</p></TooltipContent>
+                     <TooltipContent><p>Generate Audio</p></TooltipContent>
                   </Tooltip>
                 )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(doc.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Delete document</p></TooltipContent>
-                </Tooltip>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Delete document</p></TooltipContent>
+                    </Tooltip>
+                  </AlertDialogTrigger>
+                   <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete "{doc.fileName}" and its generated audio. This action cannot be undone.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDelete(doc.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           </div>
@@ -94,3 +112,5 @@ export default function DocumentLibrary({
     </div>
   );
 }
+
+    

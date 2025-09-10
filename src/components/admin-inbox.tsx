@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { getSubmissions, sendReply, AdminSubmission, deleteSubmission, rejectSubmission } from '@/lib/admin-actions';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Inbox, Send, Eye, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Label } from './ui/label';
@@ -74,15 +75,11 @@ export default function AdminInbox() {
   };
   
   const handleReject = async (submissionId: string) => {
-    if (confirm('Are you sure you want to reject this access request? An email will be sent to the user.')) {
-        await handleAction(() => rejectSubmission(submissionId), submissionId, 'Access request rejected.');
-    }
+    await handleAction(() => rejectSubmission(submissionId), submissionId, 'Access request rejected.');
   };
   
   const handleDelete = async (submissionId: string) => {
-    if (confirm('Are you sure you want to permanently delete this submission?')) {
-        await handleAction(() => deleteSubmission(submissionId), submissionId, 'Submission deleted.');
-    }
+    await handleAction(() => deleteSubmission(submissionId), submissionId, 'Submission deleted.');
   };
 
   const handleView = (submission: AdminSubmission) => {
@@ -174,9 +171,23 @@ export default function AdminInbox() {
                                 <Button size="sm" onClick={() => handleApprove(sub)} variant="secondary">
                                     <CheckCircle className="mr-2 h-4 w-4"/> Approve
                                 </Button>
-                                <Button size="sm" onClick={() => handleReject(sub.id)} variant="destructive">
-                                    <XCircle className="mr-2 h-4 w-4"/> Reject
-                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button size="sm" variant="destructive">
+                                            <XCircle className="mr-2 h-4 w-4"/> Reject
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Reject Access Request?</AlertDialogTitle>
+                                            <AlertDialogDescription>An email will be sent to the user informing them of the rejection. Are you sure?</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleReject(sub.id)} className="bg-destructive hover:bg-destructive/90">Reject</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </>
                         )}
 
@@ -186,9 +197,23 @@ export default function AdminInbox() {
                             </Button>
                         )}
                         
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(sub.id)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Submission?</AlertDialogTitle>
+                                    <AlertDialogDescription>This will permanently delete this submission. This action cannot be undone.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(sub.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                       </>
                     )}
                   </TableCell>
@@ -251,3 +276,5 @@ export default function AdminInbox() {
     </>
   );
 }
+
+    

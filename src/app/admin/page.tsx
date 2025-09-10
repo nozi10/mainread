@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, 'react, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Users, FileText, Trash2, LogOut, PlusCircle, User, File, TrendingUp, RefreshCcw, LogIn, Inbox, Loader2, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,18 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { TooltipProvider, Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import AdminInbox from '@/components/admin-inbox';
 import AdminSettings from '@/components/admin-settings';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 
 function AdminDashboard() {
   const router = useRouter();
@@ -69,22 +81,20 @@ function AdminDashboard() {
   }, [searchParams, router]);
 
   const handleDeleteUser = async (userId: string) => {
-    if (confirm('Are you sure you want to delete this user and all their documents? This action cannot be undone.')) {
-      try {
-        const result = await deleteUser(userId);
-        if (result.success) {
-            toast({ title: 'Success', description: 'User deleted successfully.' });
-            fetchAdminData(); // Refresh data
-        } else {
-            throw new Error(result.message);
-        }
-      } catch (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to delete user.',
-        });
+    try {
+      const result = await deleteUser(userId);
+      if (result.success) {
+          toast({ title: 'Success', description: 'User deleted successfully.' });
+          fetchAdminData(); // Refresh data
+      } else {
+          throw new Error(result.message);
       }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete user.',
+      });
     }
   };
 
@@ -107,38 +117,34 @@ function AdminDashboard() {
   }
   
   const handleImpersonate = async (userId: string) => {
-      if(confirm('Are you sure you want to log in as this user? Your current admin session will be temporarily replaced.')) {
-        const response = await fetch('/api/admin/impersonate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId }),
-        });
-        if(response.ok) {
-            router.push('/read');
-        } else {
-            const data = await response.json();
-            toast({ variant: 'destructive', title: 'Error', description: data.message || 'Could not impersonate user.' });
-        }
-      }
+    const response = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+    });
+    if(response.ok) {
+        router.push('/read');
+    } else {
+        const data = await response.json();
+        toast({ variant: 'destructive', title: 'Error', description: data.message || 'Could not impersonate user.' });
+    }
   }
 
   const handleDeleteDocument = async (docId: string) => {
-    if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-        try {
-            const result = await deleteDocumentAsAdmin(docId);
-            if(result.success) {
-                toast({ title: 'Success', description: 'Document deleted successfully.' });
-                fetchAdminData(); // Refresh data
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error) {
-             toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: error instanceof Error ? error.message : 'Failed to delete document.',
-            });
+    try {
+        const result = await deleteDocumentAsAdmin(docId);
+        if(result.success) {
+            toast({ title: 'Success', description: 'Document deleted successfully.' });
+            fetchAdminData(); // Refresh data
+        } else {
+            throw new Error(result.message);
         }
+    } catch (error) {
+         toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'Failed to delete document.',
+        });
     }
   }
   
@@ -296,22 +302,54 @@ function AdminDashboard() {
                                     <TooltipContent><p>Resend Invitation</p></TooltipContent>
                                 </UiTooltip>
                              )}
-                             <UiTooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" size="icon" onClick={() => handleImpersonate(user.id)} disabled={user.isAdmin}>
-                                        <LogIn className="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Log in as User</p></TooltipContent>
-                             </UiTooltip>
-                            <UiTooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="destructive" size="icon" onClick={() => handleDeleteUser(user.id)} disabled={user.isAdmin}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Delete User</p></TooltipContent>
-                            </UiTooltip>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                     <UiTooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="outline" size="icon" disabled={user.isAdmin}>
+                                                <LogIn className="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Log in as User</p></TooltipContent>
+                                     </UiTooltip>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>Log In as {user.email}?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Your current admin session will be temporarily replaced. You can return to your admin account from a banner in the app.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleImpersonate(user.id)}>Continue</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <UiTooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="destructive" size="icon" disabled={user.isAdmin}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Delete User</p></TooltipContent>
+                                    </UiTooltip>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will permanently delete the user and all their documents. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </TableCell>
                         </TableRow>
                     ))}
@@ -347,10 +385,26 @@ function AdminDashboard() {
                             <a href={doc.pdfUrl} target="_blank" rel="noopener noreferrer">
                                 <Button variant="outline">View PDF</Button>
                             </a>
-                            <Button variant="destructive" onClick={() => handleDeleteDocument(doc.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete Document?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will permanently delete the document "{doc.fileName}". This action cannot be undone.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteDocument(doc.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </TableCell>
                         </TableRow>
                     ))}
@@ -395,3 +449,5 @@ export default function AdminPage() {
     </Suspense>
   );
 }
+
+    

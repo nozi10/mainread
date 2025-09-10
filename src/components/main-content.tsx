@@ -27,7 +27,7 @@ type MainContentProps = {
   onFileChange: (files: FileList | null) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onGenerateTextAudio: (text: string) => Promise<{ success: boolean; audioUrl?: string; error?: string }>;
-  onTextExtracted: (pageNumber: number, items: any[]) => void;
+  highlightedSentence: any;
 };
 
 export default function MainContent({
@@ -38,7 +38,7 @@ export default function MainContent({
   onFileChange,
   fileInputRef,
   onGenerateTextAudio,
-  onTextExtracted,
+  highlightedSentence,
 }: MainContentProps) {
   
   const getUploadMessage = () => {
@@ -57,7 +57,7 @@ export default function MainContent({
       <PdfViewer
         file={activeDoc.pdfUrl}
         zoomLevel={pdfZoomLevel}
-        onTextExtracted={onTextExtracted}
+        highlightedSentence={highlightedSentence}
       />
     );
   }
@@ -112,3 +112,5 @@ export default function MainContent({
     </div>
   );
 }
+
+    

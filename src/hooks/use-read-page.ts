@@ -270,10 +270,8 @@ export function useReadPage() {
     if (doc.audioUrl && audioRef.current) {
         audioRef.current.src = doc.audioUrl;
         audioRef.current.load();
-    } else if (doc.textContent) {
-        handleGenerateAudioForDoc(doc);
     }
-}, [handleGenerateAudioForDoc]);
+}, []);
 
 
     const handlePlayPause = async () => {
@@ -297,7 +295,6 @@ export function useReadPage() {
     
     const handleDeleteDocument = async (docId: string | null) => {
         if (!docId) return;
-        if (!window.confirm('Are you sure you want to delete this document? This action cannot be undone.')) return;
         try {
             const result = await deleteDocument(docId);
             if (result.success) {
@@ -559,10 +556,12 @@ export function useReadPage() {
         generationState, setGenerationState, isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
         isUploading, setIsUploading, isFullScreen, setIsFullScreen, pdfZoomLevel, setPdfZoomLevel, isSavingZoom, setIsSavingZoom, localAudioUrl,
         toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef,
-        fetchSession, fetchUserDocuments, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument,
+        fetchSession, fetchUserDocuments, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument, handleGenerateAudioForDoc,
         handlePlayPause, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
         getProcessingMessage, handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
         isAudioGenerationRunning, setPageTextItems, highlightedSentence: null
     };
 }
+
+    
