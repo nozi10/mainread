@@ -1,5 +1,4 @@
 
-'use server';
 import { PollyClient, SynthesizeSpeechCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 import { Readable } from 'stream';
 import getMP3Duration from 'get-mp3-duration';
