@@ -12,3 +12,4 @@ import '@/ai/flows/format-text-for-speech.ts';
 import '@/ai_flows/quiz-feedback-flow.ts';
 import '@/ai/flows/speech-generation/openai.ts';
 import '@/ai/flows/speech-generation/lemonfox.ts';
+import '@/ai/flows/speech-generation/amazon-async.ts';

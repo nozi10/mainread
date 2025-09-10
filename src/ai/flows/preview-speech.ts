@@ -9,6 +9,8 @@ import 'dotenv/config';
 import { ai } from '@/ai/genkit';
 import { PreviewSpeechInputSchema, PreviewSpeechOutputSchema } from '@/ai/schemas';
 import OpenAI from 'openai';
+import { pollyClient, amazonVoices } from './speech-generation/amazon';
+import { SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
 
 async function handleOpenAIPreview(voice: string) {
     const { media } = await ai.generate({
@@ -49,6 +51,24 @@ async function handleLemonfoxPreview(voice: string) {
     return `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`;
 }
 
+async function handleAmazonPreview(voiceId: string) {
+    const voiceConfig = amazonVoices.find(v => v.Id === voiceId);
+    if (!voiceConfig) throw new Error(`Amazon voice not found: ${voiceId}`);
+
+    const command = new SynthesizeSpeechCommand({
+        OutputFormat: 'mp3',
+        Text: "Hello! This is a preview of my voice.",
+        VoiceId: voiceId,
+        Engine: voiceConfig.SupportedEngines?.includes('neural') ? 'neural' : 'standard',
+    });
+
+    const response = await pollyClient.send(command);
+    if (!response.AudioStream) throw new Error('No audio stream from Amazon Polly.');
+    
+    const audioBytes = await response.AudioStream.transformToByteArray();
+    return `data:audio/mp3;base64,${Buffer.from(audioBytes).toString('base64')}`;
+}
+
 
 export const previewSpeech = ai.defineFlow(
   {
@@ -68,6 +88,9 @@ export const previewSpeech = ai.defineFlow(
                 break;
             case 'lemonfox':
                 audioDataUri = await handleLemonfoxPreview(voiceName);
+                break;
+            case 'amazon':
+                audioDataUri = await handleAmazonPreview(voiceName);
                 break;
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);

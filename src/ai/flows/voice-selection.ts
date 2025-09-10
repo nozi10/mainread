@@ -26,6 +26,14 @@ const allVoices: AvailableVoice[] = [
     { name: 'openai/onyx', displayName: 'Onyx', gender: 'Male', provider: 'openai' },
     { name: 'openai/nova', displayName: 'Nova', gender: 'Female', provider: 'openai' },
     { name: 'openai/shimmer', displayName: 'Shimmer', gender: 'Female', provider: 'openai' },
+    // Amazon Polly
+    { name: 'amazon/Matthew', displayName: 'Matthew (US)', gender: 'Male', provider: 'amazon' },
+    { name: 'amazon/Joanna', displayName: 'Joanna (US)', gender: 'Female', provider: 'amazon' },
+    { name: 'amazon/Ivy', displayName: 'Ivy (US Child)', gender: 'Female', provider: 'amazon' },
+    { name: 'amazon/Justin', displayName: 'Justin (US Child)', gender: 'Male', provider: 'amazon' },
+    { name: 'amazon/Brian', displayName: 'Brian (British)', gender: 'Male', provider: 'amazon' },
+    { name: 'amazon/Amy', displayName: 'Amy (British)', gender: 'Female', provider: 'amazon' },
+    { name: 'amazon/Nicole', displayName: 'Nicole (Australian)', gender: 'Female', provider: 'amazon' },
     // Lemonfox
     { name: 'lemonfox/heart', displayName: 'Heart', gender: 'Female', provider: 'lemonfox' },
     { name: 'lemonfox/bella', displayName: 'Bella', gender: 'Female', provider: 'lemonfox' },

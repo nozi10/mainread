@@ -14,6 +14,7 @@ import { GenerateSpeechInputSchema, GenerateSpeechOutputSchema, GenerateSpeechIn
 import { formatTextForSpeech } from './format-text-for-speech';
 import { generateOpenAIVoice } from './speech-generation/openai';
 import { generateLemonfoxVoice } from './speech-generation/lemonfox';
+import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
 
 
 // This function can be directly called from client components as a Server Action.
@@ -41,6 +42,10 @@ export async function generateSpeech(
             case 'lemonfox':
                 audioDataUris = await generateLemonfoxVoice(formattedText, voiceName, speakingRate);
                 break;
+            case 'amazon':
+                // For Amazon, we start an async job and return a taskId
+                const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId!);
+                return { asyncTaskId: taskId };
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);
         }
