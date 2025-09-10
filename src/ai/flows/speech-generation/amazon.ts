@@ -1,6 +1,4 @@
 
-'use server';
-
 import { PollyClient, _Record } from '@aws-sdk/client-polly';
 import { S3Client } from '@aws-sdk/client-s3';
 
