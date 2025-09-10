@@ -15,7 +15,7 @@ import { AiDialogType } from '@/components/ai-dialog';
 import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
 import { cleanPdfText } from '@/ai/flows/clean-text-flow';
 import { generateSpeech } from '@/ai/flows/generate-speech';
-import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
+import { startAmazonVoiceGeneration, checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
 
 type GenerationState = 'idle' | 'generating' | 'polling' | 'error';
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
@@ -64,6 +64,7 @@ export function useReadPage() {
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [pdfZoomLevel, setPdfZoomLevel] = useState(1);
     const [isSavingZoom, setIsSavingZoom] = useState(false);
+    const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
 
     const { toast } = useToast();
     const router = useRouter();
@@ -71,6 +72,8 @@ export function useReadPage() {
     const previewAudioRef = useRef<HTMLAudioElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const pollerRef = useRef<NodeJS.Timeout | null>(null);
+    const localAudioUrlRef = useRef<string | null>(null);
+    const chatWindowRef = useRef<HTMLDivElement>(null);
     
     const fetchUserDocuments = useCallback(async () => {
         try {
@@ -119,19 +122,21 @@ export function useReadPage() {
         // Cleanup poller on unmount
         return () => {
             if (pollerRef.current) clearInterval(pollerRef.current);
+            if (localAudioUrlRef.current) {
+                URL.revokeObjectURL(localAudioUrlRef.current);
+            }
         }
 
     }, []);
 
     // Effect to handle auto-play when a new audioUrl appears
     useEffect(() => {
-        if (audioRef.current && activeDoc?.audioUrl) {
+        const sourceUrl = activeDoc?.audioUrl || localAudioUrl;
+        if (audioRef.current && sourceUrl) {
             const currentSrc = audioRef.current.src;
-            const newSrc = activeDoc.audioUrl;
-            
             // Only update and play if the source is new and valid
-            if (newSrc && currentSrc !== newSrc) {
-                audioRef.current.src = newSrc;
+            if (sourceUrl && currentSrc !== sourceUrl) {
+                audioRef.current.src = sourceUrl;
                 audioRef.current.load();
                 const playPromise = audioRef.current.play();
                 if (playPromise !== undefined) {
@@ -147,7 +152,7 @@ export function useReadPage() {
                 }
             }
         }
-    }, [activeDoc?.audioUrl, toast]);
+    }, [activeDoc?.audioUrl, localAudioUrl, toast]);
 
     const handleLogout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
@@ -163,6 +168,11 @@ export function useReadPage() {
             audioRef.current.src = "";
             audioRef.current.removeAttribute('src'); // Fully clear the source
         }
+        if (localAudioUrlRef.current) {
+          URL.revokeObjectURL(localAudioUrlRef.current);
+          localAudioUrlRef.current = null;
+        }
+        setLocalAudioUrl(null);
         setAudioDuration(0);
         setAudioCurrentTime(0);
         setAudioProgress(0);
@@ -243,7 +253,7 @@ export function useReadPage() {
                     if (status.status === 'completed' && status.audioUrl) {
                         if (pollerRef.current) clearInterval(pollerRef.current);
                         const updatedDoc = await saveDocument({ id: activeDoc.id, audioUrl: status.audioUrl });
-                        setActiveDoc(updatedDoc);
+                        setActiveDoc(updatedDoc); // This will trigger the useEffect for playback
                         await fetchUserDocuments();
                         setGenerationState('idle');
                         toast({ title: "Success", description: "Audio ready and will play automatically." });
@@ -263,6 +273,13 @@ export function useReadPage() {
           } else if (result.audioDataUris && result.audioDataUris.length > 0) {
             // This is the flow for providers that return data URIs (OpenAI, Lemonfox)
             const mergedAudioBlob = await mergeAudio(result.audioDataUris);
+            if (localAudioUrlRef.current) {
+                URL.revokeObjectURL(localAudioUrlRef.current);
+            }
+            const newLocalUrl = URL.createObjectURL(mergedAudioBlob);
+            localAudioUrlRef.current = newLocalUrl;
+            setLocalAudioUrl(newLocalUrl); // This will trigger the useEffect for playback
+
             const audioFileName = `${activeDoc.fileName.replace(/\.pdf$/i, '') || 'audio'}.mp3`;
             
             const uploadAudioResponse = await fetch('/api/upload', {
@@ -278,10 +295,9 @@ export function useReadPage() {
             
             if (newAudioUrl) {
                 const updatedDoc = await saveDocument({ id: activeDoc.id, audioUrl: newAudioUrl });
-                setActiveDoc(updatedDoc); 
-                await fetchUserDocuments(); 
+                await fetchUserDocuments();
                 setGenerationState('idle');
-                toast({ title: "Success", description: "Audio generated and will play automatically." });
+                toast({ title: "Success", description: "Audio generated and saved." });
             }
           } else {
             throw new Error("Audio generation resulted in no audio output.");
@@ -539,7 +555,7 @@ export function useReadPage() {
         aiSummaryOutput, setAiSummaryOutput, aiQuizOutput, setAiQuizOutput, aiGlossaryOutput, setAiGlossaryOutput, session, setSession,
         generationState, setGenerationState, isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
         isUploading, setIsUploading, isFullScreen, setIsFullScreen, pdfZoomLevel, setPdfZoomLevel, isSavingZoom, setIsSavingZoom,
-        toast, audioRef, previewAudioRef, fileInputRef,
+        toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef,
         fetchSession, fetchUserDocuments, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument,
         handlePlayPause, handleGenerateAudio, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
