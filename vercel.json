@@ -1,4 +1,12 @@
 {
+  "functions": {
+    "app/**": {
+      "maxDuration": 300
+    },
+    "src/app/**": {
+      "maxDuration": 300
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
