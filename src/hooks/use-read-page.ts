@@ -18,7 +18,6 @@ import { generateSpeech } from '@/ai/flows/generate-speech';
 import { mergeAudio } from '@/lib/audio-utils';
 import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
 
-type GenerationState = 'idle' | 'generating' | 'polling' | 'error';
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
 
 export function useReadPage() {
@@ -41,7 +40,6 @@ export function useReadPage() {
     const [aiQuizOutput, setAiQuizOutput] = useState<GenerateQuizOutput | null>(null);
     const [aiGlossaryOutput, setAiGlossaryOutput] = useState<GenerateGlossaryOutput | null>(null);
     const [session, setSession] = useState<UserSession | null>(null);
-    const [generationState, setGenerationState] = useState<GenerationState>('idle');
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isChatLoading, setIsChatLoading] = useState(false);
     const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
@@ -60,6 +58,7 @@ export function useReadPage() {
     const pollerRef = useRef<NodeJS.Timeout | null>(null);
     const localAudioUrlRef = useRef<string | null>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
+    const uploadTargetFolderId = useRef<string | null>(null);
     
     const fetchUserDocumentsAndFolders = useCallback(async () => {
         try {
@@ -169,25 +168,27 @@ export function useReadPage() {
         setAudioDuration(0);
         setAudioCurrentTime(0);
         setAudioProgress(0);
-        setGenerationState('idle');
         if (pollerRef.current) clearInterval(pollerRef.current);
     };
 
-    const handleUploadNewDocumentClick = () => {
+    const handleUploadNewDocumentClick = (folderId?: string) => {
         clearActiveDoc();
+        uploadTargetFolderId.current = folderId || null;
         if (!activeDoc) {
              fileInputRef.current?.click();
         }
     };
     
     const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
-      if (generationState !== 'idle') return;
+      if (doc.audioGenerationStatus === 'processing') return;
       if (!doc.textContent || !doc.id) return;
   
-      setGenerationState('generating');
-      toast({ title: "Generating Audio", description: "This may take a few moments..." });
-  
       try {
+        const updatedDoc = await saveDocument({ id: doc.id, audioGenerationStatus: 'processing' });
+        setActiveDoc(updatedDoc);
+        await fetchUserDocumentsAndFolders();
+        toast({ title: "Starting Audio Generation", description: "This may take a few moments..." });
+
         const result = await generateSpeech({ 
             text: doc.textContent, 
             voice: selectedVoice, 
@@ -197,7 +198,6 @@ export function useReadPage() {
           });
         
         if (result.pollyTaskId) {
-          setGenerationState('polling');
           toast({ title: "Processing Audio", description: "Amazon Polly is generating your audio in the background." });
           
           pollerRef.current = setInterval(async () => {
@@ -205,22 +205,19 @@ export function useReadPage() {
                   const status = await checkAmazonVoiceGeneration(result.pollyTaskId!);
                   if (status.status === 'completed' && status.audioUrl) {
                       if (pollerRef.current) clearInterval(pollerRef.current);
-                      
-                      const updatedDoc = await saveDocument({ id: doc.id!, audioUrl: status.audioUrl });
-                      
-                      setActiveDoc(updatedDoc); 
+                      const finalDoc = await saveDocument({ id: doc.id!, audioUrl: status.audioUrl, audioGenerationStatus: 'completed' });
+                      setActiveDoc(finalDoc); 
                       await fetchUserDocumentsAndFolders();
-                      setGenerationState('idle');
                       toast({ title: "Success", description: "Audio ready and will play automatically." });
 
                   } else if (status.status === 'failed') {
                       if (pollerRef.current) clearInterval(pollerRef.current);
-                      setGenerationState('error');
+                      await saveDocument({ id: doc.id!, audioGenerationStatus: 'failed' });
                       toast({ variant: "destructive", title: "Audio Error", description: "Amazon Polly failed to process the audio." });
                   }
               } catch (pollError) {
                   if (pollerRef.current) clearInterval(pollerRef.current);
-                  setGenerationState('error');
+                  await saveDocument({ id: doc.id!, audioGenerationStatus: 'failed' });
                   toast({ variant: "destructive", title: "Polling Error", description: "Could not check audio generation status." });
               }
           }, 5000);
@@ -241,10 +238,9 @@ export function useReadPage() {
           const newAudioUrl = audioBlobResult.url;
           
           if (newAudioUrl) {
-              const updatedDoc = await saveDocument({ id: doc.id, audioUrl: newAudioUrl });
-              setActiveDoc(updatedDoc);
+              const finalDoc = await saveDocument({ id: doc.id, audioUrl: newAudioUrl, audioGenerationStatus: 'completed' });
+              setActiveDoc(finalDoc);
               await fetchUserDocumentsAndFolders();
-              setGenerationState('idle');
               toast({ title: "Success", description: "Audio generated and saved." });
           }
         } else {
@@ -255,9 +251,11 @@ export function useReadPage() {
         console.error('Speech generation error', error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
         toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio. ${errorMessage}` });
-        setGenerationState('error');
+        await saveDocument({ id: doc.id, audioGenerationStatus: 'failed' });
+      } finally {
+        await fetchUserDocumentsAndFolders();
       }
-  }, [generationState, selectedVoice, speakingRate, toast, fetchUserDocumentsAndFolders]);
+  }, [selectedVoice, speakingRate, toast, fetchUserDocumentsAndFolders]);
 
     const handleSelectDocument = useCallback(async (doc: Document) => {
         clearActiveDoc();
@@ -486,15 +484,6 @@ export function useReadPage() {
         }
     };
 
-    const getProcessingMessage = () => {
-        switch (generationState) {
-            case 'generating': return 'Generating audio...';
-            case 'polling': return 'Processing audio...';
-            case 'error': return 'An error occurred during audio generation.';
-            default: return '';
-        }
-    };
-
     const handleFileChange = (files: FileList | null) => {
         if (files && files[0]) handleFileUpload(files[0]);
     };
@@ -529,7 +518,14 @@ export function useReadPage() {
             const { cleanedText } = await cleanPdfText({ rawText });
             setDocumentText(cleanedText);
             setUploadStage('saving');
-            const newDoc = await saveDocument({ fileName: file.name, pdfUrl: blob.url, textContent: cleanedText, zoomLevel: 1 });
+            const newDoc = await saveDocument({ 
+                fileName: file.name, 
+                pdfUrl: blob.url, 
+                textContent: cleanedText, 
+                zoomLevel: 1,
+                folderId: uploadTargetFolderId.current || null
+            });
+            uploadTargetFolderId.current = null; // Reset after use
             await fetchUserDocumentsAndFolders();
             handleSelectDocument(newDoc);
             toast({ title: "Success", description: "Your document has been prepared." });
@@ -576,22 +572,20 @@ export function useReadPage() {
         await fetchUserDocumentsAndFolders();
     };
 
-    const isAudioGenerationRunning = generationState === 'generating' || generationState === 'polling';
-
     return {
         activeDoc, setActiveDoc, documentText, setDocumentText,
         isSpeaking, setIsSpeaking, audioProgress, setAudioProgress, audioDuration, setAudioDuration, audioCurrentTime, setAudioCurrentTime,
         availableVoices, setAvailableVoices, selectedVoice, setSelectedVoice, speakingRate, setSpeakingRate, playbackRate, setPlaybackRate,
         userDocuments, setUserDocuments, userFolders, isAiDialogOpen, setIsAiDialogOpen, aiDialogType, setAiDialogType, aiIsLoading, setAiIsLoading,
         aiSummaryOutput, setAiSummaryOutput, aiQuizOutput, setAiQuizOutput, aiGlossaryOutput, setAiGlossaryOutput, session, setSession,
-        generationState, setGenerationState, isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
+        isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
         isUploading, setIsUploading, isFullScreen, setIsFullScreen, pdfZoomLevel, setPdfZoomLevel, isSavingZoom, setIsSavingZoom, localAudioUrl,
         toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef, isPreviewAudioPlaying,
         fetchSession, fetchUserDocumentsAndFolders, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument, handleGenerateAudioForDoc,
         handlePlayPause, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
-        getProcessingMessage, handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
+        handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
         handleCreateFolder, handleDeleteFolder, handleMoveDocument,
-        isAudioGenerationRunning, highlightedSentence: null
+        highlightedSentence: null
     };
 }
