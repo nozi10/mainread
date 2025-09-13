@@ -150,13 +150,13 @@ export default function DocumentLibrary({
                 </div>
                 {expandedFolders[folder.id] && (
                     <div className="pl-6 pt-1 space-y-1">
-                        {documents.filter(d => d.folderId === folder.id).map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, isAudioGenerating, onDragStart}} />)}
+                        {documents.filter(d => d.folderId === folder.id).map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, isAudioGenerating, onDragStart: handleDragStart}} />)}
                     </div>
                 )}
             </div>
         ))}
          <div onDragOver={e => e.preventDefault()} onDrop={(e) => handleDrop(e, null)}>
-            {rootDocuments.map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, isAudioGenerating, onDragStart}} />)}
+            {rootDocuments.map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, isAudioGenerating, onDragStart: handleDragStart}} />)}
         </div>
       </div>
     </div>
