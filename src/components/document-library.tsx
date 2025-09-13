@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Mic, Trash2, FileText, Library, PlusCircle, Cloud, Folder as FolderIcon, FolderPlus, ChevronRight } from 'lucide-react';
+import { Mic, Trash2, FileText, Library, PlusCircle, Cloud, Folder as FolderIcon, FolderPlus, ChevronRight, UploadCloud, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Document, Folder } from '@/lib/db';
 import { Input } from './ui/input';
@@ -18,8 +18,7 @@ type DocumentLibraryProps = {
   onSelect: (doc: Document) => void;
   onDelete: (docId: string) => void;
   onGenerateAudio: (doc: Document) => void;
-  isAudioGenerating: boolean;
-  onUploadNew: () => void;
+  onUploadNew: (folderId?: string) => void;
   onCreateFolder: (name: string) => Promise<void>;
   onDeleteFolder: (folderId: string) => Promise<void>;
   onMoveDocument: (docId: string, folderId: string | null) => Promise<void>;
@@ -32,7 +31,6 @@ export default function DocumentLibrary({
   onSelect,
   onDelete,
   onGenerateAudio,
-  isAudioGenerating,
   onUploadNew,
   onCreateFolder,
   onDeleteFolder,
@@ -92,7 +90,7 @@ export default function DocumentLibrary({
             </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onUploadNew}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onUploadNew()}>
                         <PlusCircle className="h-5 w-5" />
                     </Button>
                 </TooltipTrigger>
@@ -121,49 +119,59 @@ export default function DocumentLibrary({
                     <button onClick={() => handleToggleFolder(folder.id)} className="flex items-center flex-1 gap-2">
                         <ChevronRight className={cn("h-4 w-4 transition-transform", expandedFolders[folder.id] && "rotate-90")}/>
                         <FolderIcon />
-                        <span className="truncate max-w-[150px] font-medium">{folder.name}</span>
+                        <span className="truncate max-w-[120px] font-medium">{folder.name}</span>
                     </button>
-                    <AlertDialog>
+                    <div className="flex items-center ml-auto opacity-0 group-hover:opacity-100">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                </AlertDialogTrigger>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onUploadNew(folder.id)}>
+                                    <UploadCloud className="h-4 w-4" />
+                                </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Delete folder</p></TooltipContent>
+                            <TooltipContent><p>Upload to folder</p></TooltipContent>
                         </Tooltip>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                            <AlertDialogTitle>Delete "{folder.name}"?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This will permanently delete the folder. Documents inside will be moved to the root. This cannot be undone.
-                            </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onDeleteFolder(folder.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                        <AlertDialog>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Delete folder</p></TooltipContent>
+                            </Tooltip>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Delete "{folder.name}"?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete the folder. Documents inside will be moved to the root. This cannot be undone.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => onDeleteFolder(folder.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
                 </div>
                 {expandedFolders[folder.id] && (
                     <div className="pl-6 pt-1 space-y-1">
-                        {documents.filter(d => d.folderId === folder.id).map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, isAudioGenerating, onDragStart: handleDragStart}} />)}
+                        {documents.filter(d => d.folderId === folder.id).map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, onDragStart: handleDragStart}} />)}
                     </div>
                 )}
             </div>
         ))}
          <div onDragOver={e => e.preventDefault()} onDrop={(e) => handleDrop(e, null)}>
-            {rootDocuments.map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, isAudioGenerating, onDragStart: handleDragStart}} />)}
+            {rootDocuments.map(doc => <DocumentItem key={doc.id} {...{doc, activeDocId, onSelect, onDelete, onGenerateAudio, onDragStart: handleDragStart}} />)}
         </div>
       </div>
     </div>
   );
 }
 
-const DocumentItem = ({ doc, activeDocId, onSelect, onDelete, onGenerateAudio, isAudioGenerating, onDragStart }: { doc: Document; activeDocId: string | null; onSelect: (doc: Document) => void; onDelete: (docId: string) => void; onGenerateAudio: (doc: Document) => void; isAudioGenerating: boolean; onDragStart: (e: React.DragEvent<HTMLDivElement>, docId: string) => void; }) => (
+const DocumentItem = ({ doc, activeDocId, onSelect, onDelete, onGenerateAudio, onDragStart }: { doc: Document; activeDocId: string | null; onSelect: (doc: Document) => void; onDelete: (docId: string) => void; onGenerateAudio: (doc: Document) => void; onDragStart: (e: React.DragEvent<HTMLDivElement>, docId: string) => void; }) => (
     <div 
         draggable 
         onDragStart={(e) => onDragStart(e, doc.id)}
@@ -182,21 +190,24 @@ const DocumentItem = ({ doc, activeDocId, onSelect, onDelete, onGenerateAudio, i
             <TooltipContent><p>{doc.fileName}</p></TooltipContent>
             </Tooltip>
             <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-            {doc.audioUrl ? (
+            {doc.audioGenerationStatus === 'processing' ? (
                 <Tooltip>
-                <TooltipTrigger asChild>
-                    <Cloud className="h-4 w-4 text-primary mr-1" />
-                </TooltipTrigger>
-                <TooltipContent><p>Audio is saved</p></TooltipContent>
+                    <TooltipTrigger asChild><Loader2 className="h-4 w-4 animate-spin text-primary mr-1" /></TooltipTrigger>
+                    <TooltipContent><p>Audio is generating...</p></TooltipContent>
+                </Tooltip>
+            ) : doc.audioGenerationStatus === 'completed' && doc.audioUrl ? (
+                <Tooltip>
+                    <TooltipTrigger asChild><Cloud className="h-4 w-4 text-primary mr-1" /></TooltipTrigger>
+                    <TooltipContent><p>Audio is ready</p></TooltipContent>
                 </Tooltip>
             ) : (
                 <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isAudioGenerating} onClick={() => onGenerateAudio(doc)}>
-                    <Mic className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Generate Audio</p></TooltipContent>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onGenerateAudio(doc)}>
+                            <Mic className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Generate Audio</p></TooltipContent>
                 </Tooltip>
             )}
             <AlertDialog>

@@ -30,16 +30,20 @@ export interface Folder {
     createdAt: string;
 }
 
+export type AudioGenerationStatus = 'idle' | 'processing' | 'completed' | 'failed';
+
 export interface Document {
   id: string; 
   userId: string;
   fileName: string;
   pdfUrl: string;
-  textContent: string; // Add this field to store cleaned text
+  textContent: string;
   audioUrl: string | null;
+  audioGenerationStatus: AudioGenerationStatus;
+  audioGenerationError?: string | null;
   zoomLevel: number;
   createdAt: string;
-  folderId: string | null; // Add this field
+  folderId: string | null;
   chatHistory?: ChatMessage[];
   quizAttempt?: QuizAttempt | null;
 }
@@ -48,13 +52,12 @@ export interface User {
     id: string;
     name: string;
     email: string;
-    username: string | null; // Can be null for users who haven't set it yet
-    password: string; // This is the hashed password
+    username: string | null;
+    password: string; 
     isAdmin: boolean;
     createdAt: string;
     setupToken: string | null;
     setupTokenExpiry: string | null;
-    // User preferences
     avatarUrl?: string | null;
     defaultVoice?: string | null;
     defaultSpeakingRate?: number | null;
@@ -124,7 +127,7 @@ export async function saveDocument(docData: Partial<Document>): Promise<Document
     const updatedDoc: Document = {
       ...existingDocRaw,
       ...docData,
-      id: docId, // Ensure id is set correctly
+      id: docId,
     };
     await kv.set(docKey, updatedDoc);
     return updatedDoc;
@@ -141,6 +144,7 @@ export async function saveDocument(docData: Partial<Document>): Promise<Document
       pdfUrl: docData.pdfUrl,
       textContent: docData.textContent,
       audioUrl: docData.audioUrl || null,
+      audioGenerationStatus: 'idle',
       zoomLevel: docData.zoomLevel || 1,
       createdAt: new Date().toISOString(),
       folderId: docData.folderId || null,
@@ -203,22 +207,18 @@ export async function deleteDocument(docId: string): Promise<{ success: boolean,
             throw new Error('You do not have permission to delete this document.');
         }
         
-        // Delete from Vercel Blob if URL matches
         if (doc.pdfUrl && doc.pdfUrl.includes('.blob.vercel-storage.com')) {
             await deleteBlob(doc.pdfUrl);
         }
 
-        // Handle deletion from either Vercel Blob or S3 for the audio file
         if (doc.audioUrl) {
             if (doc.audioUrl.includes('.blob.vercel-storage.com')) {
                 await deleteBlob(doc.audioUrl);
             } else if (doc.audioUrl.includes('s3.amazonaws.com')) {
-                // This is an S3 URL, so we delete it from the S3 bucket
                 try {
                     const url = new URL(doc.audioUrl);
-                    // Robustly get bucket name and key
                     const bucketName = url.hostname.split('.s3.amazonaws.com')[0];
-                    const objectKey = url.pathname.substring(1); // remove leading '/'
+                    const objectKey = url.pathname.substring(1); 
                     
                     if (!bucketName || !objectKey) {
                         throw new Error("Could not parse S3 URL for deletion.");
@@ -234,12 +234,10 @@ export async function deleteDocument(docId: string): Promise<{ success: boolean,
 
                 } catch (s3Error) {
                     console.error("Failed to delete object from S3, it may have already been removed:", s3Error);
-                    // We don't re-throw, as we still want to remove the DB record
                 }
             }
         }
 
-        // Delete from KV database
         const pipeline = kv.pipeline();
         pipeline.del(docKey);
         pipeline.lrem(`${prefix}:user:${doc.userId}:docs`, 1, docId);
@@ -280,7 +278,6 @@ export async function clearChatHistory(docId: string): Promise<Document> {
     return updatedDoc;
 }
 
-// Folder actions
 export async function getFolders(): Promise<Folder[]> {
     const session = await getSession();
     if (!session?.userId) return [];
@@ -328,7 +325,6 @@ export async function deleteFolder(folderId: string): Promise<{ success: boolean
         throw new Error("Folder not found or access denied.");
     }
     
-    // Find all documents in this folder and move them to root
     const allDocs = await getDocuments();
     const docsToMove = allDocs.filter(doc => doc.folderId === folderId);
     

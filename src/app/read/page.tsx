@@ -37,7 +37,7 @@ export default function ReadPage() {
 
       <SidebarContent>
         <SidebarMenuItem>
-          <SidebarMenuButton onClick={state.handleUploadNewDocumentClick}>
+          <SidebarMenuButton onClick={() => state.handleUploadNewDocumentClick()}>
             <UploadCloud />
             Upload New Document
           </SidebarMenuButton>
@@ -51,7 +51,7 @@ export default function ReadPage() {
           onSelectedVoiceChange={state.setSelectedVoice}
           speakingRate={state.speakingRate}
           onSpeakingRateChange={state.setSpeakingRate}
-          isAudioGenerating={state.isAudioGenerationRunning}
+          isAudioGenerating={state.activeDoc?.audioGenerationStatus === 'processing'}
           isSpeaking={state.isSpeaking}
           onPreviewVoice={state.handlePreviewVoice}
         />
@@ -92,7 +92,6 @@ export default function ReadPage() {
           onSelect={state.handleSelectDocument}
           onDelete={state.handleDeleteDocument}
           onGenerateAudio={state.handleGenerateAudioForDoc}
-          isAudioGenerating={state.isAudioGenerationRunning}
           onUploadNew={state.handleUploadNewDocumentClick}
           onCreateFolder={state.handleCreateFolder}
           onDeleteFolder={state.handleDeleteFolder}
@@ -139,12 +138,11 @@ export default function ReadPage() {
               highlightedSentence={null}
             />
           </main>
-          {(state.activeDoc || state.isAudioGenerationRunning || state.localAudioUrl) && (
+          {(state.activeDoc || state.localAudioUrl) && (
             <div className="absolute inset-x-0 bottom-0 z-10">
               <AudioPlayer
+                docStatus={state.activeDoc?.audioGenerationStatus || 'idle'}
                 isSpeaking={state.isSpeaking}
-                processingStage={state.generationState}
-                processingMessage={state.getProcessingMessage()}
                 onPlayPause={state.handlePlayPause}
                 canPlay={!!(state.activeDoc?.audioUrl || state.localAudioUrl)}
                 playbackRate={state.playbackRate}

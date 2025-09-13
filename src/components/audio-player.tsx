@@ -3,19 +3,19 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Loader2, Download, Wind, FastForward, Rewind, ZoomIn, ZoomOut, Maximize, Minimize, Save } from 'lucide-react';
+import { Play, Pause, Loader2, Download, Wind, FastForward, Rewind, ZoomIn, ZoomOut, Maximize, Minimize, Save, AlertCircle } from 'lucide-react';
 import { Card } from './ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Slider } from './ui/slider';
 import { Separator } from './ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import type { AudioGenerationStatus } from '@/lib/db';
 
 
 type AudioPlayerProps = {
   isSpeaking: boolean;
-  processingStage: 'idle' | 'generating' | 'polling' | 'error';
-  processingMessage: string;
+  docStatus: AudioGenerationStatus;
   onPlayPause: () => void;
   canPlay: boolean;
   playbackRate: number;
@@ -29,7 +29,6 @@ type AudioPlayerProps = {
   onSeek: (value: number) => void;
   onForward: () => void;
   onRewind: () => void;
-  // PDF controls
   isPdfLoaded: boolean;
   zoomLevel: number;
   onZoomIn: () => void;
@@ -52,8 +51,7 @@ const formatTime = (seconds: number): string => {
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({
   isSpeaking,
-  processingStage,
-  processingMessage,
+  docStatus,
   onPlayPause,
   canPlay,
   playbackRate,
@@ -67,7 +65,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onSeek,
   onForward,
   onRewind,
-  // PDF props
   isPdfLoaded,
   zoomLevel,
   onZoomIn,
@@ -77,7 +74,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onSaveZoom,
   isSavingZoom,
 }) => {
-  const isGeneratingSpeech = processingStage !== 'idle' && processingStage !== 'error';
+  const isGeneratingSpeech = docStatus === 'processing';
   const hasAudio = duration > 0;
   const isDesktop = useMediaQuery('(min-width: 768px)');
   
@@ -98,17 +95,23 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       a.remove();
     } catch (error) {
       console.error('Download failed:', error);
-      // Fallback for browsers that might block this, or for CORS issues
       window.open(downloadUrl, '_blank');
     }
   };
+  
+  const getProcessingMessage = () => {
+    switch(docStatus) {
+        case 'processing': return 'Generating audio...';
+        case 'failed': return 'Audio generation failed.';
+        default: return '';
+    }
+  }
 
 
   return (
     <div className="p-2 md:p-4 w-full">
       <Card className="max-w-3xl mx-auto p-4 shadow-2xl bg-card/90 backdrop-blur-sm">
         <div className="flex items-center gap-2 md:gap-4">
-            {/* Audio Controls */}
             <div className="flex items-center gap-1 md:gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -141,7 +144,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 </Tooltip>
             </div>
             
-            {/* Progress Bar */}
             <div className="flex-1 flex flex-col gap-2">
                  <Slider
                     value={[currentTime]}
@@ -153,14 +155,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
                     <span>{formatTime(currentTime)}</span>
-                     {isGeneratingSpeech && <span className="text-xs font-medium">{processingMessage}</span>}
+                    <span className={cn("text-xs font-medium flex items-center gap-1", docStatus === 'failed' && "text-destructive")}>
+                      {docStatus === 'failed' && <AlertCircle className="h-4 w-4" />}
+                      {getProcessingMessage()}
+                    </span>
                     <span>{formatTime(duration)}</span>
                 </div>
             </div>
             
             {isDesktop && <Separator orientation="vertical" className="h-10" />}
 
-            {/* PDF Controls */}
             <div className="hidden md:flex items-center gap-1">
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -199,7 +203,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             
             <Separator orientation="vertical" className="h-10" />
             
-             {/* Extra Controls */}
              <div className="flex items-center gap-1">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
