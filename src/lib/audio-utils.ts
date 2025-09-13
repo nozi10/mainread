@@ -18,5 +18,9 @@ export async function mergeAudio(audioDataUris: string[]): Promise<Blob> {
         merged.set(new Uint8Array(buffer), offset);
         offset += buffer.byteLength;
     });
-    return new Blob([merged], { type: 'audio/mp3' });
+
+    const firstUri = audioDataUris[0] || '';
+    const mimeType = firstUri.substring(firstUri.indexOf(':') + 1, firstUri.indexOf(';')) || 'audio/mp3';
+
+    return new Blob([merged], { type: mimeType });
 }

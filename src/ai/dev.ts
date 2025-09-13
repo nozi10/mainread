@@ -14,3 +14,4 @@ import '@/ai/flows/speech-generation/openai.ts';
 import '@/ai/flows/speech-generation/lemonfox.ts';
 import '@/ai/flows/speech-generation/amazon-async.ts';
 import '@/ai/flows/speech-generation/amazon-sync.ts';
+import '@/ai/flows/speech-generation/vibevoice.ts';

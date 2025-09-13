@@ -11,6 +11,7 @@ import { PreviewSpeechInputSchema, PreviewSpeechOutputSchema } from '@/ai/schema
 import OpenAI from 'openai';
 import { pollyClient, amazonVoices } from './speech-generation/amazon';
 import { SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { Client } from '@gradio/client';
 
 async function handleOpenAIPreview(voice: string) {
     const { media } = await ai.generate({
@@ -69,6 +70,27 @@ async function handleAmazonPreview(voiceId: string) {
     return `data:audio/mp3;base64,${Buffer.from(audioBytes).toString('base64')}`;
 }
 
+async function handleVibeVoicePreview(voiceId: string) {
+    const client = await Client.connect("NeuralFalcon/VibeVoice-Colab");
+    const result = await client.predict("/generate_podcast_with_timestamps", { 		
+            num_speakers: 1, 		
+            script: "Hello! This is a preview of my voice.", 		
+            speaker_1: voiceId,
+    });
+
+    const audioOutput = result.data?.find((d: any) => d && typeof d === 'object' && d.url);
+
+    if (!audioOutput || !audioOutput.url) {
+        throw new Error('No audio URL returned from VibeVoice API for preview.');
+    }
+
+    const audioResponse = await fetch(audioOutput.url);
+    if (!audioResponse.ok) throw new Error(`Failed to fetch preview audio from VibeVoice: ${audioResponse.statusText}`);
+    
+    const audioBuffer = await audioResponse.arrayBuffer();
+    return `data:audio/wav;base64,${Buffer.from(audioBuffer).toString('base64')}`;
+}
+
 
 export const previewSpeech = ai.defineFlow(
   {
@@ -91,6 +113,9 @@ export const previewSpeech = ai.defineFlow(
                 break;
             case 'amazon':
                 audioDataUri = await handleAmazonPreview(voiceName);
+                break;
+            case 'vibevoice':
+                audioDataUri = await handleVibeVoicePreview(voiceName);
                 break;
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);

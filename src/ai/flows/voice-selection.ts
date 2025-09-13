@@ -14,7 +14,7 @@ const AvailableVoiceSchema = z.object({
   name: z.string().describe('The unique identifier for the voice, including provider.'),
   displayName: z.string().describe('The user-facing name for the voice.'),
   gender: z.string().describe('The gender of the voice.'),
-  provider: z.enum(['openai', 'amazon', 'lemonfox']).describe('The TTS provider for the voice.'),
+  provider: z.enum(['openai', 'amazon', 'lemonfox', 'vibevoice']).describe('The TTS provider for the voice.'),
 });
 export type AvailableVoice = z.infer<typeof AvailableVoiceSchema>;
 
@@ -55,6 +55,11 @@ const allVoices: AvailableVoice[] = [
     { name: 'lemonfox/puck', displayName: 'Puck', gender: 'Male', provider: 'lemonfox' },
     { name: 'lemonfox/adam', displayName: 'Adam', gender: 'Male', provider: 'lemonfox' },
     { name: 'lemonfox/santa', displayName: 'Santa', gender: 'Male', provider: 'lemonfox' },
+    // VibeVoice
+    { name: 'vibevoice/en-Alice_woman', displayName: 'Alice', gender: 'Female', provider: 'vibevoice' },
+    { name: 'vibevoice/en-Carter_man', displayName: 'Carter', gender: 'Male', provider: 'vibevoice' },
+    { name: 'vibevoice/en-Frank_man', displayName: 'Frank', gender: 'Male', provider: 'vibevoice' },
+    { name: 'vibevoice/en-Maya_woman', displayName: 'Maya', gender: 'Female', provider: 'vibevoice' },
 ];
 
 export async function getAvailableVoices(): Promise<AvailableVoice[]> {
