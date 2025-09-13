@@ -11,6 +11,7 @@ import { Separator } from './ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import type { AudioGenerationStatus } from '@/lib/db';
+import { cn } from '@/lib/utils';
 
 
 type AudioPlayerProps = {
