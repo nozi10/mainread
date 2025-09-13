@@ -145,7 +145,7 @@ export default function DocumentLibrary({
                                 <AlertDialogHeader>
                                 <AlertDialogTitle>Delete "{folder.name}"?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will permanently delete the folder. Documents inside will be moved to the root. This cannot be undone.
+                                    This will permanently delete the folder and ALL documents inside it. This action cannot be undone.
                                 </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

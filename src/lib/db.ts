@@ -325,19 +325,26 @@ export async function deleteFolder(folderId: string): Promise<{ success: boolean
         throw new Error("Folder not found or access denied.");
     }
     
-    const allDocs = await getDocuments();
-    const docsToMove = allDocs.filter(doc => doc.folderId === folderId);
-    
-    const pipeline = kv.pipeline();
-    docsToMove.forEach(doc => {
-        const updatedDoc = { ...doc, folderId: null };
-        pipeline.set(`readify:doc:${doc.id}`, updatedDoc);
-    });
+    // Get all document IDs for the user
+    const userDocListKey = `readify:user:${session.userId}:docs`;
+    const docIds = await kv.lrange<string[]>(userDocListKey, 0, -1);
+    if (docIds.length > 0) {
+        const docKeys = docIds.map(id => `readify:doc:${id}`);
+        const docs = await kv.mget<Document[]>(...docKeys);
+        const docsToDelete = docs.filter((doc): doc is Document => doc !== null && doc.folderId === folderId);
+        
+        // Delete each document inside the folder
+        for (const doc of docsToDelete) {
+            await deleteDocument(doc.id);
+        }
+    }
 
+    // Delete the folder itself
+    const pipeline = kv.pipeline();
     pipeline.del(`readify:folder:${folderId}`);
     pipeline.lrem(`readify:user:${session.userId}:folders`, 1, folderId);
-    
     await pipeline.exec();
+    
     return { success: true };
 }
 
