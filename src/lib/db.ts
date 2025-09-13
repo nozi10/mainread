@@ -23,6 +23,13 @@ export interface QuizAttempt {
     completedAt: string;
 }
 
+export interface Folder {
+    id: string;
+    userId: string;
+    name: string;
+    createdAt: string;
+}
+
 export interface Document {
   id: string; 
   userId: string;
@@ -32,6 +39,7 @@ export interface Document {
   audioUrl: string | null;
   zoomLevel: number;
   createdAt: string;
+  folderId: string | null; // Add this field
   chatHistory?: ChatMessage[];
   quizAttempt?: QuizAttempt | null;
 }
@@ -135,6 +143,7 @@ export async function saveDocument(docData: Partial<Document>): Promise<Document
       audioUrl: docData.audioUrl || null,
       zoomLevel: docData.zoomLevel || 1,
       createdAt: new Date().toISOString(),
+      folderId: docData.folderId || null,
       chatHistory: [],
     };
     
@@ -268,5 +277,91 @@ export async function clearChatHistory(docId: string): Promise<Document> {
 
     await kv.set(docKey, updatedDoc);
 
+    return updatedDoc;
+}
+
+// Folder actions
+export async function getFolders(): Promise<Folder[]> {
+    const session = await getSession();
+    if (!session?.userId) return [];
+    
+    const folderListKey = `readify:user:${session.userId}:folders`;
+    const folderIds = await kv.lrange<string[]>(folderListKey, 0, -1);
+    if (folderIds.length === 0) return [];
+
+    const validFolderIds = folderIds.filter(id => id);
+    if (validFolderIds.length === 0) return [];
+    
+    const folderKeys = validFolderIds.map(id => `readify:folder:${id}`);
+    const folders = await kv.mget<Folder[]>(...folderKeys);
+    
+    return folders
+        .filter((f): f is Folder => f !== null)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function createFolder(name: string): Promise<Folder> {
+    const session = await getSession();
+    if (!session?.userId) throw new Error("Authentication required.");
+
+    const newFolder: Folder = {
+        id: randomUUID(),
+        userId: session.userId,
+        name,
+        createdAt: new Date().toISOString()
+    };
+    
+    const pipeline = kv.pipeline();
+    pipeline.set(`readify:folder:${newFolder.id}`, newFolder);
+    pipeline.lpush(`readify:user:${session.userId}:folders`, newFolder.id);
+    await pipeline.exec();
+    
+    return newFolder;
+}
+
+export async function deleteFolder(folderId: string): Promise<{ success: boolean, message?: string }> {
+    const session = await getSession();
+    if (!session?.userId) throw new Error("Authentication required.");
+
+    const folder: Folder | null = await kv.get(`readify:folder:${folderId}`);
+    if (!folder || folder.userId !== session.userId) {
+        throw new Error("Folder not found or access denied.");
+    }
+    
+    // Find all documents in this folder and move them to root
+    const allDocs = await getDocuments();
+    const docsToMove = allDocs.filter(doc => doc.folderId === folderId);
+    
+    const pipeline = kv.pipeline();
+    docsToMove.forEach(doc => {
+        const updatedDoc = { ...doc, folderId: null };
+        pipeline.set(`readify:doc:${doc.id}`, updatedDoc);
+    });
+
+    pipeline.del(`readify:folder:${folderId}`);
+    pipeline.lrem(`readify:user:${session.userId}:folders`, 1, folderId);
+    
+    await pipeline.exec();
+    return { success: true };
+}
+
+export async function moveDocumentToFolder(docId: string, folderId: string | null): Promise<Document> {
+    const session = await getSession();
+    if (!session?.userId) throw new Error("Authentication required.");
+
+    const doc: Document | null = await kv.get(`readify:doc:${docId}`);
+    if (!doc || doc.userId !== session.userId) {
+        throw new Error("Document not found or access denied.");
+    }
+
+    if (folderId) {
+        const folder: Folder | null = await kv.get(`readify:folder:${folderId}`);
+        if (!folder || folder.userId !== session.userId) {
+            throw new Error("Target folder not found or access denied.");
+        }
+    }
+
+    const updatedDoc = { ...doc, folderId };
+    await kv.set(`readify:doc:${doc.id}`, updatedDoc);
     return updatedDoc;
 }

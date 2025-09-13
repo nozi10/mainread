@@ -10,7 +10,7 @@ import { summarizePdf, SummarizePdfOutput } from '@/ai/flows/summarize-pdf';
 import { chatWithPdf } from '@/ai/flows/chat-with-pdf';
 import { generateGlossary, GenerateGlossaryOutput } from '@/ai/flows/glossary-flow';
 import { generateQuiz, type GenerateQuizOutput } from '@/ai/flows/quiz-flow';
-import { getDocuments, saveDocument, Document, getUserSession, ChatMessage, deleteDocument, clearChatHistory, UserSession } from '@/lib/db';
+import { getDocuments, saveDocument, Document, getUserSession, ChatMessage, deleteDocument, clearChatHistory, UserSession, getFolders, Folder, createFolder, deleteFolder, moveDocumentToFolder } from '@/lib/db';
 import { AiDialogType } from '@/components/ai-dialog';
 import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
 import { cleanPdfText } from '@/ai/flows/clean-text-flow';
@@ -33,6 +33,7 @@ export function useReadPage() {
     const [speakingRate, setSpeakingRate] = useState(1);
     const [playbackRate, setPlaybackRate] = useState(1);
     const [userDocuments, setUserDocuments] = useState<Document[]>([]);
+    const [userFolders, setUserFolders] = useState<Folder[]>([]);
     const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
     const [aiDialogType, setAiDialogType] = useState<AiDialogType>('summary');
     const [aiIsLoading, setAiIsLoading] = useState(false);
@@ -60,10 +61,12 @@ export function useReadPage() {
     const localAudioUrlRef = useRef<string | null>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
     
-    const fetchUserDocuments = useCallback(async () => {
+    const fetchUserDocumentsAndFolders = useCallback(async () => {
         try {
-          const docs = await getDocuments();
+          const [docs, folders] = await Promise.all([getDocuments(), getFolders()]);
           setUserDocuments(docs);
+          setUserFolders(folders);
+
           // If there's an active document, find its updated version in the new list
           if (activeDoc) {
             const updatedActiveDoc = docs.find(d => d.id === activeDoc.id);
@@ -75,8 +78,8 @@ export function useReadPage() {
             }
           }
         } catch (error) {
-          console.error('Failed to fetch documents', error);
-          toast({ variant: "destructive", title: "Error", description: "Could not load your documents." });
+          console.error('Failed to fetch data', error);
+          toast({ variant: "destructive", title: "Error", description: "Could not load your library." });
         }
     }, [toast, activeDoc]);
 
@@ -93,7 +96,7 @@ export function useReadPage() {
 
     useEffect(() => {
         fetchSession();
-        fetchUserDocuments();
+        fetchUserDocumentsAndFolders();
         async function fetchVoices() {
           try {
             const voices = await getAvailableVoices();
@@ -115,13 +118,13 @@ export function useReadPage() {
 
     useEffect(() => {
         if (!audioRef.current) return;
-
-        const handleAutoplay = async (url: string) => {
-            const playPromise = audioRef.current.play();
-            if (playPromise !== undefined) {
+        
+        if (localAudioUrl) {
+            // Autoplay for temporary, newly generated audio
+            const handleAutoplay = async () => {
+                if (!audioRef.current) return;
                 try {
-                    await playPromise;
-                    setIsSpeaking(true);
+                    await audioRef.current.play();
                 } catch (e) {
                     console.error("Autoplay failed:", e);
                     setIsSpeaking(false);
@@ -131,23 +134,14 @@ export function useReadPage() {
                         description: "Could not auto-play audio due to browser restrictions. Please press play manually."
                     });
                 }
-            }
-        };
-
-        if (localAudioUrl) {
-            // Autoplay for temporary, newly generated audio
-            if (audioRef.current.src !== localAudioUrl) {
-                audioRef.current.src = localAudioUrl;
-                audioRef.current.load();
-                handleAutoplay(localAudioUrl);
-            }
-        } else if (activeDoc?.audioUrl) {
+            };
+            audioRef.current.src = localAudioUrl;
+            handleAutoplay();
+        } else if (activeDoc?.audioUrl && audioRef.current.src !== activeDoc.audioUrl) {
             // Load but do NOT autoplay for existing documents
-            if (audioRef.current.src !== activeDoc.audioUrl) {
-                audioRef.current.src = activeDoc.audioUrl;
-                audioRef.current.load();
-                setIsSpeaking(false); // Ensure we start in a paused state
-            }
+            audioRef.current.src = activeDoc.audioUrl;
+            audioRef.current.load();
+            setIsSpeaking(false); // Ensure we start in a paused state
         }
 
     }, [activeDoc?.audioUrl, localAudioUrl, toast]);
@@ -215,7 +209,7 @@ export function useReadPage() {
                       const updatedDoc = await saveDocument({ id: doc.id!, audioUrl: status.audioUrl });
                       
                       setActiveDoc(updatedDoc); 
-                      await fetchUserDocuments();
+                      await fetchUserDocumentsAndFolders();
                       setGenerationState('idle');
                       toast({ title: "Success", description: "Audio ready and will play automatically." });
 
@@ -249,7 +243,7 @@ export function useReadPage() {
           if (newAudioUrl) {
               const updatedDoc = await saveDocument({ id: doc.id, audioUrl: newAudioUrl });
               setActiveDoc(updatedDoc);
-              await fetchUserDocuments();
+              await fetchUserDocumentsAndFolders();
               setGenerationState('idle');
               toast({ title: "Success", description: "Audio generated and saved." });
           }
@@ -263,7 +257,7 @@ export function useReadPage() {
         toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio. ${errorMessage}` });
         setGenerationState('error');
       }
-  }, [generationState, selectedVoice, speakingRate, toast, fetchUserDocuments]);
+  }, [generationState, selectedVoice, speakingRate, toast, fetchUserDocumentsAndFolders]);
 
     const handleSelectDocument = useCallback(async (doc: Document) => {
         clearActiveDoc();
@@ -308,7 +302,7 @@ export function useReadPage() {
             if (result.success) {
                 toast({ title: "Success", description: "Document deleted successfully." });
                 if (activeDoc?.id === docId) clearActiveDoc();
-                fetchUserDocuments();
+                fetchUserDocumentsAndFolders();
             } else {
                 throw new Error(result.message);
             }
@@ -536,7 +530,7 @@ export function useReadPage() {
             setDocumentText(cleanedText);
             setUploadStage('saving');
             const newDoc = await saveDocument({ fileName: file.name, pdfUrl: blob.url, textContent: cleanedText, zoomLevel: 1 });
-            await fetchUserDocuments();
+            await fetchUserDocumentsAndFolders();
             handleSelectDocument(newDoc);
             toast({ title: "Success", description: "Your document has been prepared." });
         } catch (error) {
@@ -557,7 +551,7 @@ export function useReadPage() {
       setIsSavingZoom(true);
       try {
           await saveDocument({ id: activeDoc.id, zoomLevel: pdfZoomLevel });
-          await fetchUserDocuments();
+          await fetchUserDocumentsAndFolders();
           toast({ title: 'Zoom level saved' });
       } catch (e) {
           toast({ variant: 'destructive', title: 'Error', description: 'Could not save zoom level.'});
@@ -566,21 +560,38 @@ export function useReadPage() {
       }
     };
 
+    // Folder actions
+    const handleCreateFolder = async (name: string) => {
+        await createFolder(name);
+        await fetchUserDocumentsAndFolders();
+    };
+
+    const handleDeleteFolder = async (folderId: string) => {
+        await deleteFolder(folderId);
+        await fetchUserDocumentsAndFolders();
+    };
+    
+    const handleMoveDocument = async (docId: string, folderId: string | null) => {
+        await moveDocumentToFolder(docId, folderId);
+        await fetchUserDocumentsAndFolders();
+    };
+
     const isAudioGenerationRunning = generationState === 'generating' || generationState === 'polling';
 
     return {
         activeDoc, setActiveDoc, documentText, setDocumentText,
         isSpeaking, setIsSpeaking, audioProgress, setAudioProgress, audioDuration, setAudioDuration, audioCurrentTime, setAudioCurrentTime,
         availableVoices, setAvailableVoices, selectedVoice, setSelectedVoice, speakingRate, setSpeakingRate, playbackRate, setPlaybackRate,
-        userDocuments, setUserDocuments, isAiDialogOpen, setIsAiDialogOpen, aiDialogType, setAiDialogType, aiIsLoading, setAiIsLoading,
+        userDocuments, setUserDocuments, userFolders, isAiDialogOpen, setIsAiDialogOpen, aiDialogType, setAiDialogType, aiIsLoading, setAiIsLoading,
         aiSummaryOutput, setAiSummaryOutput, aiQuizOutput, setAiQuizOutput, aiGlossaryOutput, setAiGlossaryOutput, session, setSession,
         generationState, setGenerationState, isChatOpen, setIsChatOpen, isChatLoading, setIsChatLoading, uploadStage, setUploadStage,
         isUploading, setIsUploading, isFullScreen, setIsFullScreen, pdfZoomLevel, setPdfZoomLevel, isSavingZoom, setIsSavingZoom, localAudioUrl,
         toast, audioRef, previewAudioRef, localAudioUrlRef, router, chatWindowRef, fileInputRef, isPreviewAudioPlaying,
-        fetchSession, fetchUserDocuments, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument, handleGenerateAudioForDoc,
+        fetchSession, fetchUserDocumentsAndFolders, handleLogout, clearActiveDoc, handleUploadNewDocumentClick, handleSelectDocument, handleGenerateAudioForDoc,
         handlePlayPause, handleDeleteDocument, handleAudioTimeUpdate, handlePreviewVoice, handlePlayAiResponse,
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
         getProcessingMessage, handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
+        handleCreateFolder, handleDeleteFolder, handleMoveDocument,
         isAudioGenerationRunning, highlightedSentence: null
     };
 }

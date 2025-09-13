@@ -87,12 +87,16 @@ export default function ReadPage() {
 
         <DocumentLibrary
           documents={state.userDocuments}
+          folders={state.userFolders}
           activeDocId={state.activeDoc?.id || null}
           onSelect={state.handleSelectDocument}
           onDelete={state.handleDeleteDocument}
           onGenerateAudio={state.handleGenerateAudioForDoc}
           isAudioGenerating={state.isAudioGenerationRunning}
           onUploadNew={state.handleUploadNewDocumentClick}
+          onCreateFolder={state.handleCreateFolder}
+          onDeleteFolder={state.handleDeleteFolder}
+          onMoveDocument={state.handleMoveDocument}
         />
         
       </SidebarContent>
