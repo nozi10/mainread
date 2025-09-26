@@ -139,12 +139,12 @@ export async function generateLemonfoxVoiceWithTimestamps(
     const speechMarksFileName = `${sanitizedBaseName}.json`;
 
     const [audioBlobResult, speechMarksBlobResult] = await Promise.all([
-        fetch('/api/upload', {
+        fetch('http://localhost:3000/api/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'audio/mp3', 'x-vercel-filename': audioFileName, 'x-doc-id': docId },
             body: Buffer.from(combinedAudioBuffer),
         }).then(res => res.json()),
-        fetch('/api/upload', {
+        fetch('http://localhost:3000/api/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-vercel-filename': speechMarksFileName, 'x-doc-id': docId },
             body: formattedSpeechMarks.map(mark => JSON.stringify(mark)).join('\n'),
