@@ -10,7 +10,7 @@
  */
 import 'dotenv/config';
 import { ai } from '@/ai/genkit';
-import { GenerateSpeechInputSchema, GenerateSpeechOutputSchema, GenerateSpeechInput } from '@/ai/schemas';
+import { GenerateSpeechInputSchema, GenerateSpeechOutput, GenerateSpeechInput } from '@/ai/schemas';
 import { formatTextForSpeech } from './format-text-for-speech';
 import { generateOpenAIVoice } from './speech-generation/openai';
 import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
@@ -22,7 +22,7 @@ import { generateLemonfoxVoice } from './speech-generation/lemonfox';
 // This function can be directly called from client components as a Server Action.
 export async function generateSpeech(
   input: GenerateSpeechInput
-): Promise<GenerateSpeechOutputSchema> {
+): Promise<GenerateSpeechOutput> {
     
     if (!input.text || !input.text.trim()) {
         throw new Error("Input text cannot be empty.");

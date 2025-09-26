@@ -6,7 +6,7 @@ import type { User } from '@/lib/db';
 import { cookies } from 'next/headers';
 
 export async function POST(req: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const impersonatorId = cookieStore.get('impersonator_id')?.value;
 
   if (!impersonatorId) {

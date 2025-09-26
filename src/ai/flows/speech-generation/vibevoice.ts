@@ -22,7 +22,10 @@ export async function generateVibeVoiceSpeech(
 
     // The result.data is an array. Based on the docs, the audio file is one of the elements.
     // We need to find the one that corresponds to the audio output.
-    const audioOutput = result.data?.find((d: any) => d && typeof d === 'object' && d.url);
+    let audioOutput;
+    if (result.data && Array.isArray(result.data)) {
+        audioOutput = result.data.find((d: any) => d && typeof d === 'object' && d.url);
+    }
 
     if (!audioOutput || !audioOutput.url) {
         throw new Error('No audio URL returned from VibeVoice API.');

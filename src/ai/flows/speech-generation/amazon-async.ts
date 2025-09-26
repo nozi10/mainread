@@ -7,7 +7,7 @@
  */
 
 import { pollyClient } from './amazon';
-import { StartSpeechSynthesisTaskCommand, GetSpeechSynthesisTaskCommand, SpeechMarkType } from '@aws-sdk/client-polly';
+import { StartSpeechSynthesisTaskCommand, GetSpeechSynthesisTaskCommand, SpeechMarkType, VoiceId } from '@aws-sdk/client-polly';
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || '';
 if (!S3_BUCKET_NAME) {
@@ -46,7 +46,7 @@ export async function startAmazonVoiceGeneration(
     OutputS3KeyPrefix: `${sanitizedBaseName}.mp3`,
     Text: ssmlText,
     TextType: 'ssml',
-    VoiceId: voiceId,
+    VoiceId: voiceId as VoiceId,
     Engine: 'neural',
   });
 
@@ -58,7 +58,7 @@ export async function startAmazonVoiceGeneration(
       SpeechMarkTypes: [SpeechMarkType.WORD, SpeechMarkType.SENTENCE],
       Text: ssmlText,
       TextType: 'ssml',
-      VoiceId: voiceId,
+      VoiceId: voiceId as VoiceId,
       Engine: 'neural',
   });
 

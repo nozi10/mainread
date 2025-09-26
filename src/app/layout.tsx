@@ -20,7 +20,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
-  const impersonatorId = cookies().get('impersonator_id')?.value;
+  const impersonatorId = (await cookies()).get('impersonator_id')?.value;
   const isImpersonating = !!impersonatorId && session?.isAdmin === false;
 
   return (
