@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import type { Document } from '@/lib/db';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TextToSpeechTab from './text-to-speech-tab';
+import type { SpeechMark } from '@/hooks/use-read-page';
 
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), { 
   ssr: false,
@@ -27,7 +28,9 @@ type MainContentProps = {
   onFileChange: (files: FileList | null) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onGenerateTextAudio: (text: string) => Promise<{ success: boolean; audioUrl?: string; error?: string }>;
-  highlightedSentence: any;
+  highlightedSentence: SpeechMark | null;
+  highlightColor: string;
+  highlightStyle: 'background' | 'underline';
 };
 
 export default function MainContent({
@@ -39,6 +42,8 @@ export default function MainContent({
   fileInputRef,
   onGenerateTextAudio,
   highlightedSentence,
+  highlightColor,
+  highlightStyle,
 }: MainContentProps) {
   
   const getUploadMessage = () => {
@@ -58,6 +63,10 @@ export default function MainContent({
         file={activeDoc.pdfUrl}
         zoomLevel={pdfZoomLevel}
         highlightedSentence={highlightedSentence}
+        pageCharacterOffsets={activeDoc.pageCharacterOffsets}
+        highlightColor={highlightColor}
+        highlightStyle={highlightStyle}
+        key={activeDoc.id} // Add key to force re-mount on doc change
       />
     );
   }
@@ -112,5 +121,3 @@ export default function MainContent({
     </div>
   );
 }
-
-    

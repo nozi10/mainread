@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -6,6 +7,18 @@ export default {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  safelist: [
+    'bg-highlight-yellow',
+    'bg-highlight-green',
+    'bg-highlight-blue',
+    'bg-highlight-pink',
+    'bg-highlight-purple',
+    'dark:bg-highlight-yellow',
+    'dark:bg-highlight-green',
+    'dark:bg-highlight-blue',
+    'dark:bg-highlight-pink',
+    'dark:bg-highlight-purple',
   ],
   theme: {
     extend: {
@@ -65,6 +78,12 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+         // Custom highlight colors as CSS variables
+        'highlight-yellow': 'hsl(var(--highlight-yellow))',
+        'highlight-green': 'hsl(var(--highlight-green))',
+        'highlight-blue': 'hsl(var(--highlight-blue))',
+        'highlight-pink': 'hsl(var(--highlight-pink))',
+        'highlight-purple': 'hsl(var(--highlight-purple))',
       },
       borderRadius: {
         lg: 'var(--radius)',

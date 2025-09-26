@@ -21,6 +21,8 @@ import { getAvailableVoices, AvailableVoice } from '@/ai/flows/voice-selection';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { cn } from '@/lib/utils';
 
 const passwordFormSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required.'),
@@ -33,6 +35,8 @@ const profileFormSchema = z.object({
   defaultVoice: z.string(),
   defaultSpeakingRate: z.number().min(0.25).max(4.0),
   defaultZoomLevel: z.number().min(0.4).max(3.0),
+  highlightColor: z.string(),
+  highlightStyle: z.enum(['background', 'underline']),
 });
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
@@ -41,6 +45,14 @@ type ProfileDialogProps = {
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void; // To refresh session data on parent
 };
+
+const highlightColors = [
+    { name: 'Yellow', value: 'highlight-yellow' },
+    { name: 'Green', value: 'highlight-green' },
+    { name: 'Blue', value: 'highlight-blue' },
+    { name: 'Pink', value: 'highlight-pink' },
+    { name: 'Purple', value: 'highlight-purple' },
+];
 
 export default function ProfileDialog({ session, onOpenChange, onUpdate }: ProfileDialogProps) {
   const { toast } = useToast();
@@ -65,6 +77,8 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
             defaultVoice: session.defaultVoice || 'openai/alloy',
             defaultSpeakingRate: session.defaultSpeakingRate || 1.0,
             defaultZoomLevel: session.defaultZoomLevel || 1.0,
+            highlightColor: session.highlightColor || 'highlight-yellow',
+            highlightStyle: session.highlightStyle || 'background',
         });
       }
     }
@@ -83,6 +97,8 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
       defaultVoice: session.defaultVoice || 'openai/alloy',
       defaultSpeakingRate: session.defaultSpeakingRate || 1.0,
       defaultZoomLevel: session.defaultZoomLevel || 1.0,
+      highlightColor: session.highlightColor || 'highlight-yellow',
+      highlightStyle: session.highlightStyle || 'background',
     }
   });
 
@@ -118,6 +134,8 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
     formData.append('defaultVoice', values.defaultVoice);
     formData.append('defaultSpeakingRate', values.defaultSpeakingRate.toString());
     formData.append('defaultZoomLevel', values.defaultZoomLevel.toString());
+    formData.append('highlightColor', values.highlightColor);
+    formData.append('highlightStyle', values.highlightStyle);
     
     if (avatarInput?.files?.[0]) {
       formData.append('avatar', avatarInput.files[0]);
@@ -127,8 +145,8 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
       const result = await updateUserProfile(formData);
       if (result.success) {
         toast({ title: 'Success', description: 'Your profile has been updated.' });
-        profileForm.reset(values);
-        onUpdate(); // Trigger refresh
+        profileForm.reset(values); // Re-sync form state with new values
+        onUpdate(); // Trigger parent to refetch session
       } else {
         throw new Error(result.message || 'Failed to update profile.');
       }
@@ -277,6 +295,53 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
                     </FormItem>
                     )}
                   />
+
+                <FormField
+                    control={profileForm.control}
+                    name="highlightColor"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Highlight Color</FormLabel>
+                            <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-4">
+                                    {highlightColors.map(color => (
+                                        <FormItem key={color.value} className="flex items-center space-x-2">
+                                            <FormControl>
+                                                <RadioGroupItem value={color.value} id={color.value} />
+                                            </FormControl>
+                                            <Label htmlFor={color.value} className="flex items-center gap-2 font-normal">
+                                                <span className={cn("w-4 h-4 rounded-full border", `bg-${color.value}`)}></span>
+                                                {color.name}
+                                            </Label>
+                                        </FormItem>
+                                    ))}
+                                </RadioGroup>
+                            </FormControl>
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={profileForm.control}
+                    name="highlightStyle"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Highlight Style</FormLabel>
+                             <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                     <FormItem className="flex items-center space-x-2">
+                                        <FormControl><RadioGroupItem value="background" id="style-bg" /></FormControl>
+                                        <Label htmlFor="style-bg" className="font-normal">Background</Label>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2">
+                                        <FormControl><RadioGroupItem value="underline" id="style-ul" /></FormControl>
+                                        <Label htmlFor="style-ul" className="font-normal">Underline</Label>
+                                    </FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                        </FormItem>
+                    )}
+                />
+
                 </div>
               </ScrollArea>
               <DialogFooter className="pt-6">
@@ -347,5 +412,3 @@ export default function ProfileDialog({ session, onOpenChange, onUpdate }: Profi
     </DialogContent>
   );
 }
-
-    

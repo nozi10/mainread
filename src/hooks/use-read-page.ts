@@ -21,6 +21,14 @@ import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-
 
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
 
+export type SpeechMark = {
+  time: number;
+  type: 'sentence' | 'word';
+  start: number;
+  end: number;
+  value: string;
+};
+
 export function useReadPage() {
     const [activeDoc, setActiveDoc] = useState<Document | null>(null);
     const [documentText, setDocumentText] = useState('');
@@ -50,6 +58,11 @@ export function useReadPage() {
     const [isSavingZoom, setIsSavingZoom] = useState(false);
     const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
     const [isPreviewAudioPlaying, setIsPreviewAudioPlaying] = useState(false);
+    const [speechMarks, setSpeechMarks] = useState<SpeechMark[] | null>(null);
+    const [highlightedSentence, setHighlightedSentence] = useState<SpeechMark | null>(null);
+    const [highlightColor, setHighlightColor] = useState('highlight-yellow');
+    const [highlightStyle, setHighlightStyle] = useState<'background' | 'underline'>('background');
+
 
     const { toast } = useToast();
     const router = useRouter();
@@ -58,7 +71,7 @@ export function useReadPage() {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const pollerRef = useRef<NodeJS.Timeout | null>(null);
     const localAudioUrlRef = useRef<string | null>(null);
-    const chatWindowRef = useRef<HTMLDivElement>(null);
+    const chatWindowRef = useRef<HTMLDivElement | null>(null);
     const uploadTargetFolderId = useRef<string | null>(null);
     
     const fetchUserDocumentsAndFolders = useCallback(async () => {
@@ -91,6 +104,8 @@ export function useReadPage() {
           setSpeakingRate(sessionData.defaultSpeakingRate || 1);
           setPlaybackRate(sessionData.defaultSpeakingRate || 1);
           setPdfZoomLevel(activeDoc?.zoomLevel || sessionData.defaultZoomLevel || 1);
+          setHighlightColor(sessionData.highlightColor || 'highlight-yellow');
+          setHighlightStyle(sessionData.highlightStyle || 'background');
         }
     }, [activeDoc]);
 
@@ -147,6 +162,36 @@ export function useReadPage() {
     }, [activeDoc?.audioUrl, localAudioUrl, toast]);
 
 
+    useEffect(() => {
+        // Fetch speech marks when a document is selected
+        const fetchSpeechMarks = async () => {
+            if (activeDoc?.speechMarksUrl) {
+                try {
+                    const response = await fetch(activeDoc.speechMarksUrl);
+                    if (!response.ok) throw new Error('Failed to fetch speech marks');
+                    const marksText = await response.text();
+                    // The file is a series of JSON objects, one per line. We need to parse it.
+                    const marks = marksText.trim().split('\n').map(line => JSON.parse(line));
+                    setSpeechMarks(marks);
+                } catch (error) {
+                    console.error("Error fetching or parsing speech marks:", error);
+                    setSpeechMarks(null);
+                    toast({
+                        variant: "destructive",
+                        title: "Highlighting Error",
+                        description: "Could not load the data needed for text highlighting."
+                    });
+                }
+            } else {
+                setSpeechMarks(null);
+                setHighlightedSentence(null);
+            }
+        };
+
+        fetchSpeechMarks();
+    }, [activeDoc, toast]);
+
+
     const handleLogout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
         router.push('/login');
@@ -169,6 +214,8 @@ export function useReadPage() {
         setAudioDuration(0);
         setAudioCurrentTime(0);
         setAudioProgress(0);
+        setSpeechMarks(null);
+        setHighlightedSentence(null);
         if (pollerRef.current) clearInterval(pollerRef.current);
     };
 
@@ -319,8 +366,26 @@ const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
     
     const handleAudioTimeUpdate = () => {
         if (!audioRef.current) return;
+        const currentTimeMs = audioRef.current.currentTime * 1000;
         setAudioCurrentTime(audioRef.current.currentTime);
         if (audioDuration > 0) setAudioProgress((audioRef.current.currentTime / audioDuration) * 100);
+
+        if (!speechMarks) return;
+        
+        // Find the current sentence
+        const currentSentence = speechMarks.findLast(
+            (mark): mark is SpeechMark => mark.type === 'sentence' && currentTimeMs >= mark.time
+        );
+        
+        if (currentSentence && currentSentence.value !== highlightedSentence?.value) {
+            setHighlightedSentence(currentSentence);
+
+             // Auto-scroll logic
+            const highlightElement = document.querySelector(`span[data-sentence-id="${currentSentence.time}"]`);
+            if (highlightElement) {
+                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
     };
     
     const handlePreviewVoice = async (voice: string) => {
@@ -515,20 +580,28 @@ const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
             setUploadStage('extracting');
             (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdf.worker.min.js';
             const pdf = await (window as any).pdfjsLib.getDocument(blob.url).promise;
+            
             let rawText = '';
+            const pageCharacterOffsets: number[] = [0]; // Start with 0 for the first page
+            let runningOffset = 0;
+
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                rawText += textContent.items.map((item: any) => item.str).join(' ');
+                const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                rawText += pageText + ' ';
+                runningOffset += pageText.length + 1;
+                if (i < pdf.numPages) {
+                    pageCharacterOffsets.push(runningOffset);
+                }
             }
-            setUploadStage('cleaning');
-            const { cleanedText } = await cleanPdfText({ rawText });
-            setDocumentText(cleanedText);
+
             setUploadStage('saving');
             const newDoc = await saveDocument({ 
                 fileName: file.name, 
                 pdfUrl: blob.url, 
-                textContent: rawText, // Save the original text now
+                textContent: rawText,
+                pageCharacterOffsets,
                 zoomLevel: 1,
                 folderId: uploadTargetFolderId.current || null
             });
@@ -544,6 +617,7 @@ const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
         } finally {
             setIsUploading(false);
             setUploadStage('idle');
+            setDocumentText(''); // Clear any old text
         }
     };
 
@@ -593,6 +667,8 @@ const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
         handleSeek, handleForward, handleRewind, handleAiAction, handleQuizSubmit, handleSendMessage, handleClearChat,
         handleFileChange, handleFileUpload, handleZoomIn, handleZoomOut, handleSaveZoom, handleGenerateTextAudio,
         handleCreateFolder, handleDeleteFolder, handleMoveDocument,
-        highlightedSentence: null
+        highlightedSentence,
+        highlightColor,
+        highlightStyle,
     };
 }

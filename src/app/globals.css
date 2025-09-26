@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -41,6 +42,13 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Highlight Colors - Light Mode */
+    --highlight-yellow: 54 96% 83%;
+    --highlight-green: 145 63% 82%;
+    --highlight-blue: 206 94% 87%;
+    --highlight-pink: 336 84% 87%;
+    --highlight-purple: 265 89% 88%;
   }
   .dark {
     --background: 231 20% 12%;
@@ -75,6 +83,13 @@ body {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Highlight Colors - Dark Mode */
+    --highlight-yellow: 54 76% 33%;
+    --highlight-green: 145 63% 22%;
+    --highlight-blue: 206 94% 27%;
+    --highlight-pink: 336 84% 37%;
+    --highlight-purple: 265 89% 38%;
   }
 }
 
