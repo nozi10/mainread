@@ -12,7 +12,6 @@ import { getAllUsers, getAllDocuments, deleteUser, deleteDocumentAsAdmin, getAdm
 import type { User as UserType, DocumentWithAuthorEmail as Document, AdminDashboardStats } from '@/lib/admin-actions';
 import AddUserDialog from '@/components/add-user-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TooltipProvider, Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import AdminInbox from '@/components/admin-inbox';
 import AdminSettings from '@/components/admin-settings';
@@ -27,6 +26,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import dynamic from 'next/dynamic';
+
+const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
+const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
+const RechartsTooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
+const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
 
 
 function AdminDashboard() {
@@ -232,7 +240,7 @@ function AdminDashboard() {
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="week" />
                                 <YAxis allowDecimals={false} />
-                                <UiTooltip contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
+                                <RechartsTooltip contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}/>
                                 <Bar dataKey="signups" fill="hsl(var(--primary))" />
                             </BarChart>
                         </ResponsiveContainer>
@@ -449,3 +457,5 @@ export default function AdminPage() {
     </Suspense>
   );
 }
+
+    
