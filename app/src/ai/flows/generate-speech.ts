@@ -16,6 +16,7 @@ import { generateOpenAIVoice } from './speech-generation/openai';
 import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
 import { generateAmazonVoiceSync } from './speech-generation/amazon-sync';
 import { generateVibeVoiceSpeech } from './speech-generation/vibevoice';
+import { generateLemonfoxVoiceWithTimestamps, generateLemonfoxVoiceSync } from './speech-generation/lemonfox';
 
 
 // This function can be directly called from client components as a Server Action.
@@ -30,8 +31,9 @@ export async function generateSpeech(
     try {
         console.log('--- Starting speech generation ---');
 
-        // Note: For Amazon async, we use the raw text. For others, we format it first.
-        const textToUse = input.voice.startsWith('amazon') && input.docId
+        // Note: For Amazon and Lemonfox async, we use the raw text for accurate timestamps. For others, we format it first.
+        const useRawText = (input.voice.startsWith('amazon') || input.voice.startsWith('lemonfox')) && input.docId;
+        const textToUse = useRawText
             ? input.text
             : (await formatTextForSpeech({ rawText: input.text })).formattedText;
         
@@ -40,6 +42,8 @@ export async function generateSpeech(
         let audioDataUris: string[] = [];
         let pollyAudioTaskId: string | undefined;
         let pollyMarksTaskId: string | undefined;
+        let audioUrl: string | undefined;
+        let speechMarksUrl: string | undefined;
 
         switch (provider) {
             case 'openai':
@@ -47,6 +51,15 @@ export async function generateSpeech(
                 break;
             case 'vibevoice':
                 audioDataUris = await generateVibeVoiceSpeech(textToUse, voiceName, speakingRate);
+                break;
+            case 'lemonfox':
+                 if (input.docId) {
+                    const { uploadedAudioUrl, uploadedSpeechMarksUrl } = await generateLemonfoxVoiceWithTimestamps(textToUse, voiceName, speakingRate, input.docId, input.fileName);
+                    audioUrl = uploadedAudioUrl;
+                    speechMarksUrl = uploadedSpeechMarksUrl;
+                } else {
+                    audioDataUris = await generateLemonfoxVoiceSync(textToUse, voiceName, speakingRate);
+                }
                 break;
             case 'amazon':
                 // If a docId is present, we are generating audio for a full document
@@ -69,11 +82,15 @@ export async function generateSpeech(
             return { pollyAudioTaskId, pollyMarksTaskId };
         }
         
+        if (audioUrl && speechMarksUrl) {
+            return { audioUrl, speechMarksUrl };
+        }
+
         if (audioDataUris.length > 0) {
             return { audioDataUris };
         }
 
-        // If we get here, it means no audio was generated and it wasn't an async Polly task.
+        // If we get here, it means no audio was generated and it wasn't an async task.
         throw new Error("Audio generation resulted in no audio output.");
 
 

@@ -89,6 +89,21 @@ export function useFileUpload({
                     toast({ variant: "destructive", title: "Polling Error", description: "Could not check audio generation status." });
                 }
             }, 10000); 
+        } else if (result.audioUrl && result.speechMarksUrl) {
+            // Handle providers that return direct URLs, like Lemonfox
+             const unwantedTextPromise = identifyUnwantedText({ rawText: doc.textContent });
+             const { unwantedText } = await unwantedTextPromise;
+             
+             const finalDoc = await saveDocument({ 
+                id: doc.id!, 
+                audioUrl: result.audioUrl, 
+                speechMarksUrl: result.speechMarksUrl,
+                unwantedText: unwantedText,
+                audioGenerationStatus: 'completed' 
+            });
+            setActiveDoc(finalDoc);
+            await fetchUserDocumentsAndFolders();
+            toast({ title: "Success", description: "Audio and timestamps are ready." });
         } else if (result.audioDataUris && result.audioDataUris.length > 0) {
             const mergedAudioBlob = await mergeAudio(result.audioDataUris);
             const audioFileName = `${doc.fileName.replace(/\.pdf$/i, '') || 'audio'}.mp3`;

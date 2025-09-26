@@ -11,6 +11,7 @@ import { PreviewSpeechInputSchema, PreviewSpeechOutputSchema } from '@/ai/schema
 import { pollyClient, amazonVoices } from './speech-generation/amazon';
 import { SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
 import { Client } from '@gradio/client';
+import OpenAI from 'openai';
 
 async function handleOpenAIPreview(voice: string) {
     const { media } = await ai.generate({
@@ -69,6 +70,27 @@ async function handleVibeVoicePreview(voiceId: string) {
     return `data:audio/wav;base64,${Buffer.from(audioBuffer).toString('base64')}`;
 }
 
+async function handleLemonfoxPreview(voiceId: string) {
+    if (!process.env.LEMONFOX_API_KEY) {
+        throw new Error('Lemonfox API key is not configured.');
+    }
+
+    const lemonfox = new OpenAI({
+        apiKey: process.env.LEMONFOX_API_KEY,
+        baseURL: "https://api.lemonfox.ai/v1",
+    });
+    
+    const audio = await lemonfox.audio.speech.create({
+        input: "Hello! This is a preview of my voice.",
+        voice: voiceId,
+        response_format: "mp3",
+        model: "tts-1",
+    });
+    
+    const audioBuffer = await audio.arrayBuffer();
+    return `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`;
+}
+
 
 export const previewSpeech = ai.defineFlow(
   {
@@ -91,6 +113,9 @@ export const previewSpeech = ai.defineFlow(
                 break;
             case 'vibevoice':
                 audioDataUri = await handleVibeVoicePreview(voiceName);
+                break;
+            case 'lemonfox':
+                audioDataUri = await handleLemonfoxPreview(voiceName);
                 break;
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);
