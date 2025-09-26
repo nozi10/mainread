@@ -24,7 +24,14 @@ const formSchema = z.object({
 
 type SetupFormValues = z.infer<typeof formSchema>;
 
-export default function SetupAccountPage({ params }: { params: { token: string } }) {
+interface SetupAccountPageProps {
+  params: {
+    token:string;
+  };
+  searchParams?: { [key: string]: string | string[] | undefined };
+}
+
+export default function SetupAccountPage({ params }: SetupAccountPageProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);

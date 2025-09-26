@@ -1,7 +1,4 @@
-
 'use server';
-
-import OpenAI from 'openai';
 
 // Function to split text into chunks without breaking sentences
 function splitText(text: string, maxLength: number): string[] {
@@ -44,32 +41,39 @@ function splitText(text: string, maxLength: number): string[] {
     return chunks.filter(chunk => chunk.trim().length > 0);
 }
 
-
 export async function generateLemonfoxVoice(formattedText: string, voice: string, speed: number) {
-    if (!process.env.LEMONFOX_API_KEY) {
-        throw new Error('Lemonfox API key is not configured in environment variables.');
+    const apiKey = process.env.LEMONFOX_API_KEY;
+    if (!apiKey) {
+        throw new Error('Lemonfox API key is not configured. Please set the LEMONFOX_API_KEY environment variable.');
     }
 
-    const lemonfox = new OpenAI({
-        apiKey: process.env.LEMONFOX_API_KEY,
-        baseURL: "https://api.lemonfox.ai/v1",
-    });
-
-    // Lemonfox API may have its own character limit, chunking is a safe approach.
-    const textChunks = splitText(formattedText, 4000); 
+    // Using a safe character limit, similar to other providers.
+    const textChunks = splitText(formattedText, 4000);
     console.log(`Generated ${textChunks.length} text chunks for Lemonfox.`);
 
     const audioGenerationPromises = textChunks.map(async (chunk) => {
-        const audio = await lemonfox.audio.speech.create({
-            input: chunk,
-            voice: voice,
-            response_format: "mp3",
-            model: "tts-1",
-            speed: speed,
+        const response = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                input: chunk,
+                voice: voice,
+                speed: speed,
+                response_format: "mp3"
+            })
         });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`Lemonfox API request failed with status ${response.status}: ${errorBody}`);
+        }
         
-        const audioBuffer = await audio.arrayBuffer();
+        const audioBuffer = await response.arrayBuffer();
         return `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`;
     });
+
     return Promise.all(audioGenerationPromises);
 }
