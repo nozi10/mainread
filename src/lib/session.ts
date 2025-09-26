@@ -47,14 +47,16 @@ export async function createSession(
     userId: string, 
     isAdmin: boolean, 
     username: string | null,
-    cookieStore: ReturnType<typeof cookies> | { set: (name: string, value: string, options: Partial<ResponseCookie>) => void } = cookies()
+    cookieStore?: { set: (name: string, value: string, options: Partial<ResponseCookie>) => void }
 ) {
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     const sessionPayload = { userId, isAdmin, username };
     
     const session = await encrypt(sessionPayload);
 
-    cookieStore.set('session', session, {
+    // Use provided cookie store or default to await cookies()
+    const store = cookieStore || (await cookies());
+    store.set('session', session, {
       expires,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
