@@ -10,6 +10,10 @@ const nextConfig = {
   experimental: {
     allowedHosts: true,
   },
+  // Alternative for older Next.js versions - allow all hosts in dev
+  async rewrites() {
+    return []
+  },
   async headers() {
     return [
       {

@@ -35,7 +35,7 @@ export async function decrypt(input: string): Promise<SessionPayload | null> {
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
-  const sessionCookie = cookies().get('session')?.value;
+  const sessionCookie = (await cookies()).get('session')?.value;
   if (!sessionCookie) return null;
   
   const session = await decrypt(sessionCookie);
@@ -64,5 +64,5 @@ export async function createSession(
 }
 
 export async function deleteSession() {
-  cookies().set('session', '', { expires: new Date(0) });
+  (await cookies()).set('session', '', { expires: new Date(0) });
 }
