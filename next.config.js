@@ -6,9 +6,6 @@ const CopyPlugin = require('copy-webpack-plugin');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverActions: {
-    bodySizeLimit: 10 * 1024 * 1024, // 10MB in bytes
-  },
   async headers() {
     return [
       {
@@ -24,7 +21,7 @@ const nextConfig = {
     ]
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
     ignoreDuringBuilds: true,
