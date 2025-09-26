@@ -7,7 +7,7 @@
  */
 
 import { pollyClient, amazonVoices } from './amazon';
-import { SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { SynthesizeSpeechCommand, VoiceId } from '@aws-sdk/client-polly';
 
 // Function to split text into chunks without breaking sentences.
 // Polly's SynthesizeSpeech has a 3000 character limit for plain text. We'll use 2800 to be safe.
@@ -73,7 +73,7 @@ export async function generateAmazonVoiceSync(
       OutputFormat: 'mp3',
       Text: chunk,
       TextType: 'ssml',
-      VoiceId: voiceId,
+      VoiceId: voiceId as VoiceId,
       Engine: voiceConfig.SupportedEngines?.includes('neural') ? 'neural' : 'standard',
     });
 

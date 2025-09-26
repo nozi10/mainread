@@ -9,7 +9,7 @@ import 'dotenv/config';
 import { ai } from '@/ai/genkit';
 import { PreviewSpeechInputSchema, PreviewSpeechOutputSchema } from '@/ai/schemas';
 import { pollyClient, amazonVoices } from './speech-generation/amazon';
-import { SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { SynthesizeSpeechCommand, VoiceId } from '@aws-sdk/client-polly';
 import { Client } from '@gradio/client';
 
 async function handleOpenAIPreview(voice: string) {
@@ -37,7 +37,7 @@ async function handleAmazonPreview(voiceId: string) {
     const command = new SynthesizeSpeechCommand({
         OutputFormat: 'mp3',
         Text: "Hello! This is a preview of my voice.",
-        VoiceId: voiceId,
+        VoiceId: voiceId as VoiceId,
         Engine: voiceConfig.SupportedEngines?.includes('neural') ? 'neural' : 'standard',
     });
 
@@ -56,7 +56,10 @@ async function handleVibeVoicePreview(voiceId: string) {
             speaker_1: voiceId,
     });
 
-    const audioOutput = result.data?.find((d: any) => d && typeof d === 'object' && d.url);
+    let audioOutput;
+    if (result.data && Array.isArray(result.data)) {
+        audioOutput = result.data.find((d: any) => d && typeof d === 'object' && d.url);
+    }
 
     if (!audioOutput || !audioOutput.url) {
         throw new Error('No audio URL returned from VibeVoice API for preview.');
