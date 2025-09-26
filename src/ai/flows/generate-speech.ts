@@ -13,7 +13,6 @@ import { ai } from '@/ai/genkit';
 import { GenerateSpeechInputSchema, GenerateSpeechOutputSchema, GenerateSpeechInput } from '@/ai/schemas';
 import { formatTextForSpeech } from './format-text-for-speech';
 import { generateOpenAIVoice } from './speech-generation/openai';
-import { generateLemonfoxVoice } from './speech-generation/lemonfox';
 import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
 import { generateAmazonVoiceSync } from './speech-generation/amazon-sync';
 import { generateVibeVoiceSpeech } from './speech-generation/vibevoice';
@@ -41,9 +40,6 @@ export async function generateSpeech(
         switch (provider) {
             case 'openai':
                 audioDataUris = await generateOpenAIVoice(formattedText, voiceName, speakingRate);
-                break;
-            case 'lemonfox':
-                audioDataUris = await generateLemonfoxVoice(formattedText, voiceName, speakingRate);
                 break;
             case 'vibevoice':
                 audioDataUris = await generateVibeVoiceSpeech(formattedText, voiceName, speakingRate);

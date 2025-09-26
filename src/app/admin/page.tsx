@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { getAllUsers, getAllDocuments, deleteUser, deleteDocumentAsAdmin, getAdminDashboardStats, resendInvitation } from '@/lib/admin-actions';
+import { removeLemonfoxFromSettings } from '@/lib/cleanup-actions';
 import type { User as UserType, DocumentWithAuthorEmail as Document, AdminDashboardStats } from '@/lib/admin-actions';
 import AddUserDialog from '@/components/add-user-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,6 +48,17 @@ function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [prefilledUserData, setPrefilledUserData] = useState<{name: string, email: string, submissionId?: string} | null>(null);
+
+  useEffect(() => {
+    // Run one-time cleanup action for old database settings.
+    removeLemonfoxFromSettings().then(result => {
+      if (result.success) {
+        console.log(result.message);
+      } else {
+        console.error("Cleanup failed:", result.message);
+      }
+    });
+  }, []);
 
   const fetchAdminData = async () => {
     setIsLoading(true);
@@ -457,5 +469,3 @@ export default function AdminPage() {
     </Suspense>
   );
 }
-
-    
