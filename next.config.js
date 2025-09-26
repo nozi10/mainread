@@ -6,6 +6,10 @@ const CopyPlugin = require('copy-webpack-plugin');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Enable for Replit environment - allow all hosts
+  experimental: {
+    allowedHosts: true,
+  },
   async headers() {
     return [
       {
