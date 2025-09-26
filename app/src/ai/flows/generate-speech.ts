@@ -30,45 +30,52 @@ export async function generateSpeech(
     try {
         console.log('--- Starting speech generation ---');
 
-        const { formattedText } = await formatTextForSpeech({ rawText: input.text });
+        // Note: For Amazon async, we use the raw text. For others, we format it first.
+        const textToUse = input.voice.startsWith('amazon') && input.docId
+            ? input.text
+            : (await formatTextForSpeech({ rawText: input.text })).formattedText;
         
         const [provider, voiceName] = input.voice.split('/');
         const speakingRate = input.speakingRate || 1.0;
         let audioDataUris: string[] = [];
-        let pollyTaskId: string | undefined;
+        let pollyAudioTaskId: string | undefined;
+        let pollyMarksTaskId: string | undefined;
 
         switch (provider) {
             case 'openai':
-                audioDataUris = await generateOpenAIVoice(formattedText, voiceName, speakingRate);
+                audioDataUris = await generateOpenAIVoice(textToUse, voiceName, speakingRate);
                 break;
             case 'vibevoice':
-                audioDataUris = await generateVibeVoiceSpeech(formattedText, voiceName, speakingRate);
+                audioDataUris = await generateVibeVoiceSpeech(textToUse, voiceName, speakingRate);
                 break;
             case 'amazon':
                 // If a docId is present, we are generating audio for a full document
                 // and should use the asynchronous, S3-saving method.
                 if (input.docId) {
-                    const { taskId } = await startAmazonVoiceGeneration(formattedText, voiceName, speakingRate, input.docId, input.fileName);
-                    pollyTaskId = taskId;
+                    const { audioTaskId, marksTaskId } = await startAmazonVoiceGeneration(textToUse, voiceName, speakingRate, input.docId, input.fileName);
+                    pollyAudioTaskId = audioTaskId;
+                    pollyMarksTaskId = marksTaskId;
                 } else {
                     // Otherwise, it's a short, on-the-fly request (e.g., chat, TTS tab),
                     // so we use the synchronous method that returns a data URI directly.
-                    audioDataUris = await generateAmazonVoiceSync(formattedText, voiceName, speakingRate);
+                    audioDataUris = await generateAmazonVoiceSync(textToUse, voiceName, speakingRate);
                 }
                 break;
             default:
                 throw new Error(`Unsupported voice provider: ${provider}`);
         }
 
-        if (pollyTaskId) {
-            return { pollyTaskId };
+        if (pollyAudioTaskId && pollyMarksTaskId) {
+            return { pollyAudioTaskId, pollyMarksTaskId };
         }
         
-        if (audioDataUris.length === 0) {
-            throw new Error("No audio was generated.");
+        if (audioDataUris.length > 0) {
+            return { audioDataUris };
         }
 
-        return { audioDataUris };
+        // If we get here, it means no audio was generated and it wasn't an async Polly task.
+        throw new Error("Audio generation resulted in no audio output.");
+
 
     } catch (error: any) {
         console.error("Error in generateSpeech action:", error);
