@@ -136,6 +136,8 @@ export default function ReadPage() {
               fileInputRef={state.fileInputRef}
               onGenerateTextAudio={state.handleGenerateTextAudio}
               highlightedSentence={state.highlightedSentence}
+              highlightColor={state.session?.highlightColor || 'yellow-200'}
+              highlightStyle={state.session?.highlightStyle || 'background'}
             />
           </main>
           {(state.activeDoc || state.localAudioUrl) && (
@@ -212,5 +214,3 @@ export default function ReadPage() {
     </TooltipProvider>
   );
 }
-
-    

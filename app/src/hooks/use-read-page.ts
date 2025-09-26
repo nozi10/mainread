@@ -21,7 +21,7 @@ import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-
 
 type UploadStage = 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
 
-type SpeechMark = {
+export type SpeechMark = {
   time: number;
   type: 'sentence' | 'word';
   start: number;
@@ -576,20 +576,28 @@ const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
             setUploadStage('extracting');
             (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdf.worker.min.js';
             const pdf = await (window as any).pdfjsLib.getDocument(blob.url).promise;
+            
             let rawText = '';
+            const pageCharacterOffsets: number[] = [0]; // Start with 0 for the first page
+            let runningOffset = 0;
+
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                rawText += textContent.items.map((item: any) => item.str).join(' ');
+                const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                rawText += pageText + ' ';
+                runningOffset += pageText.length + 1;
+                if (i < pdf.numPages) {
+                    pageCharacterOffsets.push(runningOffset);
+                }
             }
-            setUploadStage('cleaning');
-            const { cleanedText } = await cleanPdfText({ rawText });
-            setDocumentText(cleanedText);
+
             setUploadStage('saving');
             const newDoc = await saveDocument({ 
                 fileName: file.name, 
                 pdfUrl: blob.url, 
-                textContent: rawText, // Save the original text now
+                textContent: rawText,
+                pageCharacterOffsets,
                 zoomLevel: 1,
                 folderId: uploadTargetFolderId.current || null
             });
@@ -605,6 +613,7 @@ const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
         } finally {
             setIsUploading(false);
             setUploadStage('idle');
+            setDocumentText(''); // Clear any old text
         }
     };
 
@@ -657,5 +666,3 @@ const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
         highlightedSentence
     };
 }
-
-    
