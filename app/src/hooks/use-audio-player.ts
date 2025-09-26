@@ -130,10 +130,6 @@ export function useAudioPlayer(audioRef: React.RefObject<HTMLAudioElement>, acti
     
     if (currentSentence && currentSentence.value !== highlightedSentence?.value) {
         setHighlightedSentence(currentSentence);
-        const highlightElement = document.querySelector(`span[data-sentence-id="${currentSentence.time}"]`);
-        if (highlightElement) {
-            highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
     }
   };
   

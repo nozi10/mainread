@@ -17,7 +17,6 @@ type PdfViewerProps = {
   file: string;
   zoomLevel: number;
   highlightedSentence: SpeechMark | null;
-  pageCharacterOffsets: number[] | null | undefined;
   highlightColor: string;
   highlightStyle: 'background' | 'underline';
 };
@@ -26,7 +25,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
     file, 
     zoomLevel,
     highlightedSentence,
-    pageCharacterOffsets,
     highlightColor,
     highlightStyle,
 }) => {
@@ -36,7 +34,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    // Reset text items when a new document is loaded
+    // Reset text items when a new document is loaded to prevent stale data
     setTextItemsByPage({});
   }, []);
 
@@ -50,6 +48,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
     });
   };
 
+  // This function is called after each page successfully renders.
+  // It extracts the text content and its coordinates, which is crucial for the HighlightLayer.
   const onPageLoadSuccess = async (page: any) => {
     try {
       const textContent = await page.getTextContent();
@@ -62,10 +62,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
     }
   };
 
+  // This effect handles the auto-scrolling.
   useEffect(() => {
     if (highlightedSentence) {
+        // Find the first span that is part of the current highlighted sentence.
         const highlightElement = document.querySelector(`span[data-sentence-id="${highlightedSentence.time}"]`);
         if (highlightElement) {
+            // Scroll the element into the center of the view smoothly.
             highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }

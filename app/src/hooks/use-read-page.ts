@@ -141,7 +141,9 @@ export function useReadPage() {
     // PDF Viewer
     pdfZoomLevel, isFullScreen, setIsFullScreen, isSavingZoom,
     handleZoomIn, handleZoomOut, handleSaveZoom,
-    highlightedSentence, highlightColor, highlightStyle,
+    highlightedSentence, 
+    highlightColor, 
+    highlightStyle,
     // Audio Player
     isSpeaking, setIsSpeaking, audioProgress, audioDuration, setAudioDuration, audioCurrentTime, playbackRate, setPlaybackRate, localAudioUrl,
     handlePlayPause, handleSeek, handleForward, handleRewind, handleAudioTimeUpdate,

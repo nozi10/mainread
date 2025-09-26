@@ -23,7 +23,7 @@ const PdfViewer = dynamic(() => import('@/components/pdf-viewer'), {
 type MainContentProps = {
   activeDoc: Document | null;
   isUploading: boolean;
-  uploadStage: 'idle' | 'uploading' | 'extracting' | 'cleaning' | 'saving' | 'error';
+  uploadStage: 'idle' | 'uploading' | 'extracting' | 'saving' | 'error';
   pdfZoomLevel: number;
   onFileChange: (files: FileList | null) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
@@ -50,7 +50,6 @@ export default function MainContent({
     switch (uploadStage) {
       case 'uploading': return 'Uploading file...';
       case 'extracting': return 'Extracting text...';
-      case 'cleaning': return 'Cleaning up content...';
       case 'saving': return 'Saving document...';
       case 'error': return 'An error occurred during upload.';
       default: return 'Drag & drop PDF here or click to upload';
@@ -63,7 +62,6 @@ export default function MainContent({
         file={activeDoc.pdfUrl}
         zoomLevel={pdfZoomLevel}
         highlightedSentence={highlightedSentence}
-        pageCharacterOffsets={activeDoc.pageCharacterOffsets}
         highlightColor={highlightColor}
         highlightStyle={highlightStyle}
         key={activeDoc.id} // Add key to force re-mount on doc change
