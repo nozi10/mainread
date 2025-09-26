@@ -14,7 +14,7 @@ const AvailableVoiceSchema = z.object({
   name: z.string().describe('The unique identifier for the voice, including provider.'),
   displayName: z.string().describe('The user-facing name for the voice.'),
   gender: z.string().describe('The gender of the voice.'),
-  provider: z.enum(['openai', 'amazon', 'vibevoice']).describe('The TTS provider for the voice.'),
+  provider: z.enum(['openai', 'amazon', 'vibevoice', 'lemonfox']).describe('The TTS provider for the voice.'),
 });
 export type AvailableVoice = z.infer<typeof AvailableVoiceSchema>;
 
@@ -27,18 +27,24 @@ const allVoices: AvailableVoice[] = [
     { name: 'openai/nova', displayName: 'Nova', gender: 'Female', provider: 'openai' },
     { name: 'openai/shimmer', displayName: 'Shimmer', gender: 'Female', provider: 'openai' },
     // Amazon Polly
-    { name: 'amazon/Matthew', displayName: 'Matthew (US)', gender: 'Male', provider: 'amazon' },
-    { name: 'amazon/Joanna', displayName: 'Joanna (US)', gender: 'Female', provider: 'amazon' },
-    { name: 'amazon/Ivy', displayName: 'Ivy (US Child)', gender: 'Female', provider: 'amazon' },
-    { name: 'amazon/Justin', displayName: 'Justin (US Child)', gender: 'Male', provider: 'amazon' },
-    { name: 'amazon/Brian', displayName: 'Brian (British)', gender: 'Male', provider: 'amazon' },
-    { name: 'amazon/Amy', displayName: 'Amy (British)', gender: 'Female', provider: 'amazon' },
-    { name: 'amazon/Nicole', displayName: 'Nicole (Australian)', gender: 'Female', provider: 'amazon' },
+    { name: 'amazon/Matthew', displayName: 'Matthew', gender: 'Male', provider: 'amazon' },
+    { name: 'amazon/Joanna', displayName: 'Joanna', gender: 'Female', provider: 'amazon' },
+    { name: 'amazon/Ivy', displayName: 'Ivy', gender: 'Female', provider: 'amazon' },
+    { name: 'amazon/Justin', displayName: 'Justin', gender: 'Male', provider: 'amazon' },
+    { name: 'amazon/Brian', displayName: 'Brian', gender: 'Male', provider: 'amazon' },
+    { name: 'amazon/Amy', displayName: 'Amy', gender: 'Female', provider: 'amazon' },
+    { name: 'amazon/Nicole', displayName: 'Nicole', gender: 'Female', provider: 'amazon' },
     // VibeVoice
     { name: 'vibevoice/en-Alice_woman', displayName: 'Alice', gender: 'Female', provider: 'vibevoice' },
     { name: 'vibevoice/en-Carter_man', displayName: 'Carter', gender: 'Male', provider: 'vibevoice' },
     { name: 'vibevoice/en-Frank_man', displayName: 'Frank', gender: 'Male', provider: 'vibevoice' },
     { name: 'vibevoice/en-Maya_woman', displayName: 'Maya', gender: 'Female', provider: 'vibevoice' },
+    // Lemonfox
+    { name: 'lemonfox/sarah', displayName: 'Sarah', gender: 'Female', provider: 'lemonfox' },
+    { name: 'lemonfox/michael', displayName: 'Michael', gender: 'Male', provider: 'lemonfox' },
+    { name: 'lemonfox/bella', displayName: 'Bella', gender: 'Female', provider: 'lemonfox' },
+    { name: 'lemonfox/liam', displayName: 'Liam', gender: 'Male', provider: 'lemonfox' },
+    { name: 'lemonfox/jessica', displayName: 'Jessica', gender: 'Female', provider: 'lemonfox' },
 ];
 
 export async function getAvailableVoices(): Promise<AvailableVoice[]> {

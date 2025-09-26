@@ -16,6 +16,7 @@ import { generateOpenAIVoice } from './speech-generation/openai';
 import { startAmazonVoiceGeneration } from './speech-generation/amazon-async';
 import { generateAmazonVoiceSync } from './speech-generation/amazon-sync';
 import { generateVibeVoiceSpeech } from './speech-generation/vibevoice';
+import { generateLemonfoxVoice } from './speech-generation/lemonfox';
 
 
 // This function can be directly called from client components as a Server Action.
@@ -47,6 +48,9 @@ export async function generateSpeech(
                 break;
             case 'vibevoice':
                 audioDataUris = await generateVibeVoiceSpeech(textToUse, voiceName, speakingRate);
+                break;
+            case 'lemonfox':
+                audioDataUris = await generateLemonfoxVoice(textToUse, voiceName, speakingRate);
                 break;
             case 'amazon':
                 // If a docId is present, we are generating audio for a full document
