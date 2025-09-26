@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useReadPage } from '@/hooks/use-read-page';
-import { Sidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
+import { Sidebar as SidebarComponent, SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import UserPanel from '@/components/user-panel';
@@ -20,98 +20,103 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import type { useReadPage as useReadPageType } from '@/hooks/use-read-page';
+
+// Define a type for the state returned by useReadPage for props
+type ReadPageState = ReturnType<typeof useReadPageType>;
+
+const Sidebar: React.FC<{ state: ReadPageState }> = ({ state }) => (
+  <>
+    <SidebarHeader>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-headline text-primary flex items-center gap-2"><BarChart /> Readify</h1>
+        <ThemeToggle />
+      </div>
+    </SidebarHeader>
+
+    <SidebarContent>
+      <SidebarMenuItem>
+        <SidebarMenuButton onClick={() => state.handleUploadNewDocumentClick()}>
+          <UploadCloud />
+          Upload New Document
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      
+      <Separator className="my-2" />
+
+      <AudioSettingsPanel
+        availableVoices={state.availableVoices}
+        selectedVoice={state.selectedVoice}
+        onSelectedVoiceChange={state.setSelectedVoice}
+        speakingRate={state.speakingRate}
+        onSpeakingRateChange={state.setSpeakingRate}
+        isAudioGenerating={state.activeDoc?.audioGenerationStatus === 'processing'}
+        isSpeaking={state.isSpeaking}
+        onPreviewVoice={state.handlePreviewVoice}
+      />
+      
+      <Separator className="my-2" />
+
+      <SidebarMenuItem>
+          <SidebarMenuButton onClick={() => state.handleAiAction('summary')} disabled={!state.documentText}>
+              <Lightbulb />
+              Summarize & Key Points
+          </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+      <SidebarMenuButton onClick={() => state.handleAiAction('glossary')} disabled={!state.documentText}>
+          <BookOpenCheck />
+          Create Glossary
+      </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+          <SidebarMenuButton onClick={() => state.handleAiAction('quiz')} disabled={!state.documentText}>
+              <BrainCircuit />
+              {state.activeDoc?.quizAttempt ? 'Review Quiz' : 'Generate Quiz'}
+          </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+      <SidebarMenuButton onClick={() => state.setIsChatOpen(true)} disabled={!state.documentText}>
+          <MessageSquare />
+          Chat with Document
+      </SidebarMenuButton>
+      </SidebarMenuItem>
+      
+      <Separator className="my-2" />
+
+      <DocumentLibrary
+        documents={state.userDocuments}
+        folders={state.userFolders}
+        activeDocId={state.activeDoc?.id || null}
+        onSelect={state.handleSelectDocument}
+        onDelete={state.handleDeleteDocument}
+        onGenerateAudio={state.handleGenerateAudioForDoc}
+        onUploadNew={state.handleUploadNewDocumentClick}
+        onCreateFolder={state.handleCreateFolder}
+        onDeleteFolder={state.handleDeleteFolder}
+        onMoveDocument={state.handleMoveDocument}
+      />
+      
+    </SidebarContent>
+    <SidebarFooter>
+      {state.session && <UserPanel session={state.session} onLogout={state.handleLogout} onUpdate={state.fetchSession} />}
+    </SidebarFooter>
+  </>
+);
+
 
 export default function ReadPage() {
   const state = useReadPage();
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
-  const SidebarContentItems = () => (
-    <>
-      <SidebarHeader>
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-headline text-primary flex items-center gap-2"><BarChart /> Readify</h1>
-          <ThemeToggle />
-        </div>
-      </SidebarHeader>
-
-      <SidebarContent>
-        <SidebarMenuItem>
-          <SidebarMenuButton onClick={() => state.handleUploadNewDocumentClick()}>
-            <UploadCloud />
-            Upload New Document
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        
-        <Separator className="my-2" />
-
-        <AudioSettingsPanel
-          availableVoices={state.availableVoices}
-          selectedVoice={state.selectedVoice}
-          onSelectedVoiceChange={state.setSelectedVoice}
-          speakingRate={state.speakingRate}
-          onSpeakingRateChange={state.setSpeakingRate}
-          isAudioGenerating={state.activeDoc?.audioGenerationStatus === 'processing'}
-          isSpeaking={state.isSpeaking}
-          onPreviewVoice={state.handlePreviewVoice}
-        />
-        
-        <Separator className="my-2" />
-
-        <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => state.handleAiAction('summary')} disabled={!state.documentText}>
-                <Lightbulb />
-                Summarize & Key Points
-            </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-        <SidebarMenuButton onClick={() => state.handleAiAction('glossary')} disabled={!state.documentText}>
-            <BookOpenCheck />
-            Create Glossary
-        </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => state.handleAiAction('quiz')} disabled={!state.documentText}>
-                <BrainCircuit />
-                {state.activeDoc?.quizAttempt ? 'Review Quiz' : 'Generate Quiz'}
-            </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-        <SidebarMenuButton onClick={() => state.setIsChatOpen(true)} disabled={!state.documentText}>
-            <MessageSquare />
-            Chat with Document
-        </SidebarMenuButton>
-        </SidebarMenuItem>
-        
-        <Separator className="my-2" />
-
-        <DocumentLibrary
-          documents={state.userDocuments}
-          folders={state.userFolders}
-          activeDocId={state.activeDoc?.id || null}
-          onSelect={state.handleSelectDocument}
-          onDelete={state.handleDeleteDocument}
-          onGenerateAudio={state.handleGenerateAudioForDoc}
-          onUploadNew={state.handleUploadNewDocumentClick}
-          onCreateFolder={state.handleCreateFolder}
-          onDeleteFolder={state.handleDeleteFolder}
-          onMoveDocument={state.handleMoveDocument}
-        />
-        
-      </SidebarContent>
-      <SidebarFooter>
-        {state.session && <UserPanel session={state.session} onLogout={state.handleLogout} onUpdate={state.fetchSession} />}
-      </SidebarFooter>
-    </>
-  );
-
   return (
     <TooltipProvider>
       <div className={cn("flex h-screen w-full bg-background", state.isFullScreen && "fixed inset-0 z-50")}>
         {isDesktop ? (
-          <Sidebar className={cn(state.isFullScreen && "hidden")}>
-             <SidebarContentItems />
-          </Sidebar>
+          <SidebarComponent className={cn(state.isFullScreen && "hidden")}>
+             <Sidebar state={state} />
+          </SidebarComponent>
         ) : (
           <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
             <SheetTrigger asChild>
@@ -120,7 +125,7 @@ export default function ReadPage() {
                 </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0 flex flex-col">
-              <SidebarContentItems />
+              <Sidebar state={state} />
             </SheetContent>
           </Sheet>
         )}
@@ -136,8 +141,8 @@ export default function ReadPage() {
               fileInputRef={state.fileInputRef}
               onGenerateTextAudio={state.handleGenerateTextAudio}
               highlightedSentence={state.highlightedSentence}
-              highlightColor={state.session?.highlightColor || 'yellow-200'}
-              highlightStyle={state.session?.highlightStyle || 'background'}
+              highlightColor={state.highlightColor}
+              highlightStyle={state.highlightStyle}
             />
           </main>
           {(state.activeDoc || state.localAudioUrl) && (
