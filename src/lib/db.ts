@@ -39,6 +39,8 @@ export interface Document {
   pdfUrl: string;
   textContent: string;
   audioUrl: string | null;
+  speechMarksUrl: string | null;
+  unwantedText: string[] | null;
   audioGenerationStatus: AudioGenerationStatus;
   audioGenerationError?: string | null;
   zoomLevel: number;
@@ -144,6 +146,8 @@ export async function saveDocument(docData: Partial<Document>): Promise<Document
       pdfUrl: docData.pdfUrl,
       textContent: docData.textContent,
       audioUrl: docData.audioUrl || null,
+      speechMarksUrl: null,
+      unwantedText: null,
       audioGenerationStatus: 'idle',
       zoomLevel: docData.zoomLevel || 1,
       createdAt: new Date().toISOString(),
@@ -188,6 +192,32 @@ export async function getDocuments(): Promise<Document[]> {
     .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
+async function deleteS3Object(url: string) {
+    try {
+        const urlObj = new URL(url);
+        // Extract bucket and key. Assumes standard S3 URL format.
+        const bucketName = urlObj.hostname.split('.')[0];
+        const objectKey = urlObj.pathname.substring(1); 
+        
+        if (!bucketName || !objectKey) {
+            throw new Error("Could not parse S3 URL for deletion.");
+        }
+
+        const command = new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: decodeURIComponent(objectKey),
+        });
+        
+        await s3Client.send(command);
+        console.log(`Successfully deleted ${objectKey} from S3 bucket ${bucketName}.`);
+
+    } catch (s3Error) {
+        // Log error but don't re-throw, as the object might have already been deleted
+        // or the URL might not have been an S3 URL.
+        console.error("Failed to delete object from S3, it may have already been removed:", s3Error);
+    }
+}
+
 export async function deleteDocument(docId: string): Promise<{ success: boolean, message?: string }> {
     const session = await getSession();
     if (!session?.userId) {
@@ -207,35 +237,20 @@ export async function deleteDocument(docId: string): Promise<{ success: boolean,
             throw new Error('You do not have permission to delete this document.');
         }
         
+        // Delete Vercel Blob assets
         if (doc.pdfUrl && doc.pdfUrl.includes('.blob.vercel-storage.com')) {
             await deleteBlob(doc.pdfUrl);
         }
-
-        if (doc.audioUrl) {
-            if (doc.audioUrl.includes('.blob.vercel-storage.com')) {
-                await deleteBlob(doc.audioUrl);
-            } else if (doc.audioUrl.includes('s3.amazonaws.com')) {
-                try {
-                    const url = new URL(doc.audioUrl);
-                    const bucketName = url.hostname.split('.s3.amazonaws.com')[0];
-                    const objectKey = url.pathname.substring(1); 
-                    
-                    if (!bucketName || !objectKey) {
-                        throw new Error("Could not parse S3 URL for deletion.");
-                    }
-
-                    const command = new DeleteObjectCommand({
-                        Bucket: bucketName,
-                        Key: decodeURIComponent(objectKey),
-                    });
-                    
-                    await s3Client.send(command);
-                    console.log(`Successfully deleted ${objectKey} from S3 bucket ${bucketName}.`);
-
-                } catch (s3Error) {
-                    console.error("Failed to delete object from S3, it may have already been removed:", s3Error);
-                }
-            }
+        if (doc.audioUrl && doc.audioUrl.includes('.blob.vercel-storage.com')) {
+            await deleteBlob(doc.audioUrl);
+        }
+        
+        // Delete S3 assets
+        if (doc.audioUrl && doc.audioUrl.includes('s3.amazonaws.com')) {
+            await deleteS3Object(doc.audioUrl);
+        }
+         if (doc.speechMarksUrl && doc.speechMarksUrl.includes('s3.amazonaws.com')) {
+            await deleteS3Object(doc.speechMarksUrl);
         }
 
         const pipeline = kv.pipeline();

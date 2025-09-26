@@ -14,6 +14,7 @@ import { getDocuments, saveDocument, Document, getUserSession, ChatMessage, dele
 import { AiDialogType } from '@/components/ai-dialog';
 import { generateQuizFeedback } from '@/ai/flows/quiz-feedback-flow';
 import { cleanPdfText } from '@/ai/flows/clean-text-flow';
+import { identifyUnwantedText } from '@/ai/flows/identify-unwanted-text';
 import { generateSpeech } from '@/ai/flows/generate-speech';
 import { mergeAudio } from '@/lib/audio-utils';
 import { checkAmazonVoiceGeneration } from '@/ai/flows/speech-generation/amazon-async';
@@ -179,13 +180,10 @@ export function useReadPage() {
         }
     };
     
-    const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
-      if (doc.audioGenerationStatus === 'processing') return;
-      if (!doc.textContent || !doc.id) return;
-  
-      try {
-        const updatedDoc = await saveDocument({ id: doc.id, audioGenerationStatus: 'processing' });
-        setActiveDoc(updatedDoc);
+const handleGenerateAudioForDoc = useCallback(async (doc: Document) => {
+    if (doc.audioGenerationStatus === 'processing' || !doc.textContent || !doc.id) return;
+    try {
+        await saveDocument({ id: doc.id, audioGenerationStatus: 'processing' });
         await fetchUserDocumentsAndFolders();
         toast({ title: "Starting Audio Generation", description: "This may take a few moments..." });
 
@@ -195,67 +193,76 @@ export function useReadPage() {
             speakingRate: speakingRate, 
             docId: doc.id,
             fileName: doc.fileName,
-          });
+        });
         
-        if (result.pollyTaskId) {
-          toast({ title: "Processing Audio", description: "Amazon Polly is generating your audio in the background." });
-          
-          pollerRef.current = setInterval(async () => {
-              try {
-                  const status = await checkAmazonVoiceGeneration(result.pollyTaskId!);
-                  if (status.status === 'completed' && status.audioUrl) {
-                      if (pollerRef.current) clearInterval(pollerRef.current);
-                      const finalDoc = await saveDocument({ id: doc.id!, audioUrl: status.audioUrl, audioGenerationStatus: 'completed' });
-                      setActiveDoc(finalDoc); 
-                      await fetchUserDocumentsAndFolders();
-                      toast({ title: "Success", description: "Audio ready and will play automatically." });
+        if (result.pollyAudioTaskId && result.pollyMarksTaskId) {
+            toast({ title: "Processing Audio & Timestamps", description: "Amazon Polly is working in the background." });
+            
+            // Simultaneously identify unwanted text
+            const unwantedTextPromise = identifyUnwantedText({ rawText: doc.textContent });
 
-                  } else if (status.status === 'failed') {
-                      if (pollerRef.current) clearInterval(pollerRef.current);
-                      await saveDocument({ id: doc.id!, audioGenerationStatus: 'failed' });
-                      toast({ variant: "destructive", title: "Audio Error", description: "Amazon Polly failed to process the audio." });
-                  }
-              } catch (pollError) {
-                  if (pollerRef.current) clearInterval(pollerRef.current);
-                  await saveDocument({ id: doc.id!, audioGenerationStatus: 'failed' });
-                  toast({ variant: "destructive", title: "Polling Error", description: "Could not check audio generation status." });
-              }
-          }, 5000);
-          
+            // Start polling for both Polly tasks
+            pollerRef.current = setInterval(async () => {
+                try {
+                    const [audioStatus, marksStatus] = await Promise.all([
+                        checkAmazonVoiceGeneration(result.pollyAudioTaskId!),
+                        checkAmazonVoiceGeneration(result.pollyMarksTaskId!)
+                    ]);
+
+                    if (audioStatus.status === 'completed' && marksStatus.status === 'completed') {
+                        if (pollerRef.current) clearInterval(pollerRef.current);
+
+                        const { unwantedText } = await unwantedTextPromise;
+
+                        const finalDoc = await saveDocument({ 
+                            id: doc.id!, 
+                            audioUrl: audioStatus.outputUrl, 
+                            speechMarksUrl: marksStatus.outputUrl,
+                            unwantedText: unwantedText,
+                            audioGenerationStatus: 'completed' 
+                        });
+                        
+                        setActiveDoc(finalDoc);
+                        await fetchUserDocumentsAndFolders();
+                        toast({ title: "Success", description: "Audio and timestamps are ready." });
+                    } else if (audioStatus.status === 'failed' || marksStatus.status === 'failed') {
+                        if (pollerRef.current) clearInterval(pollerRef.current);
+                        await saveDocument({ id: doc.id!, audioGenerationStatus: 'failed' });
+                        toast({ variant: "destructive", title: "Audio Error", description: "Amazon Polly failed to process the request." });
+                    }
+                } catch (pollError) {
+                    if (pollerRef.current) clearInterval(pollerRef.current);
+                    await saveDocument({ id: doc.id!, audioGenerationStatus: 'failed' });
+                    toast({ variant: "destructive", title: "Polling Error", description: "Could not check audio generation status." });
+                }
+            }, 10000); // Poll every 10 seconds
         } else if (result.audioDataUris && result.audioDataUris.length > 0) {
-          const mergedAudioBlob = await mergeAudio(result.audioDataUris);
-          const audioFileName = `${doc.fileName.replace(/\.pdf$/i, '') || 'audio'}.mp3`;
-          
-          const uploadAudioResponse = await fetch('/api/upload', {
-              method: 'POST',
-              headers: { 'Content-Type': 'audio/mp3', 'x-vercel-filename': audioFileName, 'x-doc-id': doc.id },
-              body: mergedAudioBlob,
-          });
-
-          if (!uploadAudioResponse.ok) throw new Error('Audio Upload failed');
-          
-          const audioBlobResult = await uploadAudioResponse.json();
-          const newAudioUrl = audioBlobResult.url;
-          
-          if (newAudioUrl) {
-              const finalDoc = await saveDocument({ id: doc.id, audioUrl: newAudioUrl, audioGenerationStatus: 'completed' });
-              setActiveDoc(finalDoc);
-              await fetchUserDocumentsAndFolders();
-              toast({ title: "Success", description: "Audio generated and saved." });
-          }
+            // Handle non-Amazon providers
+            const mergedAudioBlob = await mergeAudio(result.audioDataUris);
+            const audioFileName = `${doc.fileName.replace(/\.pdf$/i, '') || 'audio'}.mp3`;
+            const uploadAudioResponse = await fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'audio/mp3', 'x-vercel-filename': audioFileName, 'x-doc-id': doc.id },
+                body: mergedAudioBlob,
+            });
+            if (!uploadAudioResponse.ok) throw new Error('Audio Upload failed');
+            const audioBlobResult = await uploadAudioResponse.json();
+            
+            const finalDoc = await saveDocument({ id: doc.id, audioUrl: audioBlobResult.url, audioGenerationStatus: 'completed' });
+            setActiveDoc(finalDoc);
+            await fetchUserDocumentsAndFolders();
+            toast({ title: "Success", description: "Audio generated and saved." });
         } else {
-          throw new Error("Audio generation resulted in no audio output.");
+            throw new Error("Audio generation resulted in no valid output.");
         }
-
-      } catch (error: any) {
+    } catch (error: any) {
         console.error('Speech generation error', error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-        toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio. ${errorMessage}` });
-        await saveDocument({ id: doc.id, audioGenerationStatus: 'failed' });
-      } finally {
+        await saveDocument({ id: doc.id!, audioGenerationStatus: 'failed' });
+        toast({ variant: "destructive", title: "Audio Error", description: `Could not generate audio: ${error.message}` });
+    } finally {
         await fetchUserDocumentsAndFolders();
-      }
-  }, [selectedVoice, speakingRate, toast, fetchUserDocumentsAndFolders]);
+    }
+}, [selectedVoice, speakingRate, toast, fetchUserDocumentsAndFolders]);
 
     const handleSelectDocument = useCallback(async (doc: Document) => {
         clearActiveDoc();
@@ -521,7 +528,7 @@ export function useReadPage() {
             const newDoc = await saveDocument({ 
                 fileName: file.name, 
                 pdfUrl: blob.url, 
-                textContent: cleanedText, 
+                textContent: rawText, // Save the original text now
                 zoomLevel: 1,
                 folderId: uploadTargetFolderId.current || null
             });

@@ -3,10 +3,11 @@
 /**
  * @fileOverview Handles asynchronous text-to-speech using Amazon Polly's
  * StartSpeechSynthesisTask, which is designed for long-form audio.
+ * It now supports generating both the MP3 audio and the corresponding speech marks JSON file.
  */
 
 import { pollyClient } from './amazon';
-import { StartSpeechSynthesisTaskCommand, GetSpeechSynthesisTaskCommand } from '@aws-sdk/client-polly';
+import { StartSpeechSynthesisTaskCommand, GetSpeechSynthesisTaskCommand, SpeechMarkType } from '@aws-sdk/client-polly';
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || '';
 if (!S3_BUCKET_NAME) {
@@ -14,21 +15,20 @@ if (!S3_BUCKET_NAME) {
 }
 
 type StartGenerationResponse = {
-    taskId: string;
+    audioTaskId: string;
+    marksTaskId: string;
 };
 
 /**
- * Starts an asynchronous speech synthesis task with Amazon Polly.
- * This is suitable for long documents.
+ * Starts an asynchronous speech synthesis task with Amazon Polly for both audio and speech marks.
  */
 export async function startAmazonVoiceGeneration(
-  text: string,
+  text: string, // Expects raw text for accurate speech marks
   voiceId: string,
   speed: number,
   docId: string,
   fileName?: string
 ): Promise<StartGenerationResponse> {
-  // Replace characters that can break SSML
   const sanitizedText = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -36,47 +36,58 @@ export async function startAmazonVoiceGeneration(
     
   const ssmlText = `<speak><prosody rate="${Math.round(speed * 100)}%">${sanitizedText}</prosody></speak>`;
 
-  // Create a descriptive filename for S3, replacing the extension.
-  // Example: "my-report.pdf" -> "my-report.mp3"
-  const baseName = fileName
-    ? fileName.replace(/\.[^/.]+$/, "")
-    : docId;
-  
-  // Sanitize the filename for S3 key requirements, replacing spaces and removing invalid characters.
+  const baseName = fileName ? fileName.replace(/\.[^/.]+$/, "") : docId;
   const sanitizedBaseName = baseName.replace(/\s+/g, '_').replace(/[^0-9a-zA-Z!_.\-]/g, '');
-  const outputS3Key = `${sanitizedBaseName}.mp3`;
-
-  const command = new StartSpeechSynthesisTaskCommand({
+  
+  // Task for MP3 audio generation
+  const audioCommand = new StartSpeechSynthesisTaskCommand({
     OutputFormat: 'mp3',
     OutputS3BucketName: S3_BUCKET_NAME,
-    OutputS3KeyPrefix: outputS3Key, // This sets the exact filename in S3.
+    OutputS3KeyPrefix: `${sanitizedBaseName}.mp3`,
     Text: ssmlText,
     TextType: 'ssml',
     VoiceId: voiceId,
     Engine: 'neural',
   });
 
-  const response = await pollyClient.send(command);
-  const taskId = response.SynthesisTask?.TaskId;
+  // Task for JSON speech marks generation
+  const marksCommand = new StartSpeechSynthesisTaskCommand({
+      OutputFormat: 'json',
+      OutputS3BucketName: S3_BUCKET_NAME,
+      OutputS3KeyPrefix: `${sanitizedBaseName}.json`,
+      SpeechMarkTypes: [SpeechMarkType.WORD, SpeechMarkType.SENTENCE],
+      Text: ssmlText,
+      TextType: 'ssml',
+      VoiceId: voiceId,
+      Engine: 'neural',
+  });
 
-  if (!taskId) {
-    throw new Error('Failed to start Amazon Polly synthesis task.');
+  const [audioResponse, marksResponse] = await Promise.all([
+      pollyClient.send(audioCommand),
+      pollyClient.send(marksCommand)
+  ]);
+  
+  const audioTaskId = audioResponse.SynthesisTask?.TaskId;
+  const marksTaskId = marksResponse.SynthesisTask?.TaskId;
+
+  if (!audioTaskId || !marksTaskId) {
+    throw new Error('Failed to start one or both Amazon Polly synthesis tasks.');
   }
   
-  return { taskId };
+  return { audioTaskId, marksTaskId };
 }
 
-type CheckGenerationResponse = {
+type CheckTaskResponse = {
     status: 'completed' | 'inProgress' | 'failed';
-    audioUrl?: string | null;
+    outputUrl?: string | null;
 };
 
 /**
- * Checks the status of a speech synthesis task.
+ * Checks the status of a single speech synthesis task.
  */
 export async function checkAmazonVoiceGeneration(
     taskId: string
-): Promise<CheckGenerationResponse> {
+): Promise<CheckTaskResponse> {
     
     const command = new GetSpeechSynthesisTaskCommand({ TaskId: taskId });
     const response = await pollyClient.send(command);
@@ -84,7 +95,7 @@ export async function checkAmazonVoiceGeneration(
 
     switch (task?.TaskStatus) {
         case 'completed':
-            return { status: 'completed', audioUrl: task.OutputUri };
+            return { status: 'completed', outputUrl: task.OutputUri };
         case 'inProgress':
         case 'scheduled':
             return { status: 'inProgress' };
