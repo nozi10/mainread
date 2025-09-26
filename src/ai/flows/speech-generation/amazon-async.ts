@@ -38,10 +38,14 @@ export async function startAmazonVoiceGeneration(
 
   // Create a descriptive filename for S3, replacing the extension.
   // Example: "my-report.pdf" -> "my-report.mp3"
-  const outputS3Key = fileName
-    ? fileName.replace(/\.[^/.]+$/, "") + ".mp3"
-    : `${docId}.mp3`;
+  const baseName = fileName
+    ? fileName.replace(/\.[^/.]+$/, "")
+    : docId;
   
+  // Sanitize the filename for S3 key requirements, replacing spaces and removing invalid characters.
+  const sanitizedBaseName = baseName.replace(/\s+/g, '_').replace(/[^0-9a-zA-Z!_.\-]/g, '');
+  const outputS3Key = `${sanitizedBaseName}.mp3`;
+
   const command = new StartSpeechSynthesisTaskCommand({
     OutputFormat: 'mp3',
     OutputS3BucketName: S3_BUCKET_NAME,
