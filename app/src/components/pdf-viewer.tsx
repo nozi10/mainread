@@ -31,13 +31,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
     highlightStyle,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [textItemsByPage, setTextItemsByPage] = useState<TextItem[][]>([]);
+  const [textItemsByPage, setTextItemsByPage] = useState<Record<number, TextItem[]>>({});
   const { toast } = useToast();
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     // Reset text items when a new document is loaded
-    setTextItemsByPage([]);
+    setTextItemsByPage({});
   }, []);
 
   const onDocumentLoadError = (error: Error) => {
@@ -53,11 +53,10 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   const onPageLoadSuccess = async (page: any) => {
     try {
       const textContent = await page.getTextContent();
-      setTextItemsByPage(prev => {
-          const newItems = [...prev];
-          newItems[page.pageNumber - 1] = textContent.items;
-          return newItems;
-      });
+      setTextItemsByPage(prev => ({
+          ...prev,
+          [page.pageNumber]: textContent.items as TextItem[],
+      }));
     } catch (error) {
        console.error("Failed to get text content from page", error);
     }
@@ -100,9 +99,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
                 onLoadSuccess={onPageLoadSuccess}
               />
               <HighlightLayer
-                  textItems={textItemsByPage[index]}
+                  textItems={textItemsByPage[index + 1]}
                   pageNumber={index + 1}
-                  pageCharacterOffsets={pageCharacterOffsets}
                   highlightedSentence={highlightedSentence}
                   highlightColor={highlightColor}
                   highlightStyle={highlightStyle}
@@ -116,4 +114,3 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 };
 
 export default PdfViewer;
-
