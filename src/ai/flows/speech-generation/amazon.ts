@@ -1,5 +1,5 @@
 
-import { PollyClient, _Record } from '@aws-sdk/client-polly';
+import { PollyClient, Voice } from '@aws-sdk/client-polly';
 import { S3Client } from '@aws-sdk/client-s3';
 
 // Ensure AWS credentials are configured in environment variables
@@ -20,7 +20,7 @@ export const s3Client = new S3Client(awsConfig);
 
 // This is a subset of voices. You can expand this list as needed.
 // To get all voices, you would typically call the DescribeVoicesCommand.
-export const amazonVoices: _Record[] = [
+export const amazonVoices: Voice[] = [
     // US English
     { Id: 'Matthew', Gender: 'Male', LanguageCode: 'en-US', LanguageName: 'US English', Name: 'Matthew', SupportedEngines: ['neural', 'standard'] },
     { Id: 'Joanna', Gender: 'Female', LanguageCode: 'en-US', LanguageName: 'US English', Name: 'Joanna', SupportedEngines: ['neural', 'standard'] },

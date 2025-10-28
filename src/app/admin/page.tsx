@@ -29,13 +29,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import dynamic from 'next/dynamic';
 
-const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
-const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false });
-const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false });
-const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
-const RechartsTooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
-const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
+// Temporarily disabled due to a build issue with recharts and Next.js
+// const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
+// const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false });
+// const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false });
+// const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
+// const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
+// const RechartsTooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
+// const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
 
 
 function AdminDashboard() {
@@ -242,7 +243,7 @@ function AdminDashboard() {
                 </Card>
             </div>
             <div className='grid gap-4 md:grid-cols-2 mt-6'>
-                <Card>
+                {/* <Card>
                     <CardHeader>
                         <CardTitle className='flex items-center gap-2'><TrendingUp /> User Growth</CardTitle>
                     </CardHeader>
@@ -257,7 +258,7 @@ function AdminDashboard() {
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
-                </Card>
+                </Card> */}
                  <Card>
                     <CardHeader>
                         <CardTitle>Top Users by Documents</CardTitle>

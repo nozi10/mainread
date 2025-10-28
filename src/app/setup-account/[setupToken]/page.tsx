@@ -26,9 +26,8 @@ type SetupFormValues = z.infer<typeof formSchema>;
 
 interface SetupAccountPageProps {
   params: {
-    token:string;
+    setupToken: string;
   };
-  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 export default function SetupAccountPage({ params }: SetupAccountPageProps) {
@@ -47,7 +46,7 @@ export default function SetupAccountPage({ params }: SetupAccountPageProps) {
   const onSubmit = async (values: SetupFormValues) => {
     setIsLoading(true);
     try {
-      const result = await setupAccount({ ...values, token: params.token });
+      const result = await setupAccount({ ...values, token: params.setupToken });
       if (result.success) {
         toast({
           title: 'Account Setup Complete!',

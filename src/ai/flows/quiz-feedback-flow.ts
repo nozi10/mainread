@@ -8,9 +8,9 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { QuizFeedbackInputSchema, QuizFeedbackOutputSchema, type QuizFeedbackInput } from '@/ai/schemas/quiz';
+import { QuizFeedbackInputSchema, QuizFeedbackOutputSchema, type QuizFeedbackInput, type QuizFeedbackOutput } from '@/ai/schemas/quiz';
 
-export async function generateQuizFeedback(input: QuizFeedbackInput): Promise<QuizFeedbackOutputSchema> {
+export async function generateQuizFeedback(input: QuizFeedbackInput): Promise<QuizFeedbackOutput> {
   return generateQuizFeedbackFlow(input);
 }
 
